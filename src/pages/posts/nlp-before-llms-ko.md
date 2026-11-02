@@ -15,6 +15,8 @@ ChatGPT 이전에는 기계가 문장을 어떻게 이해하고 만들어 냈을
 1. 길이가 제각각인 문장을 기계가 어떻게 처리할 수 있을까?
 2. 한 작업에서 배운 언어 지식을 다른 작업에도 활용할 수 있을까?
 
+아래 코드 예제는 각각 독립적으로 실행할 수 있습니다. Python 3 환경을 기준으로 하며, 별도 라이브러리가 필요한 예제에는 설치 명령을 함께 적었습니다. 작은 예시 데이터로 개념을 확인하므로 결과를 실제 모델의 성능으로 해석하지는 마세요.
+
 ## 목차
 
 1. [자연어 처리의 주요 작업](#tasks)
@@ -72,6 +74,47 @@ ChatGPT 이전에는 기계가 문장을 어떻게 이해하고 만들어 냈을
 
 학습 중 본 적 없는 조합의 확률을 0으로 두면 자연스러운 문장도 불가능하다고 판단할 수 있습니다. 이를 완화하기 위해 관찰되지 않은 조합에도 작은 확률을 배분하는 **스무딩(smoothing)**을 사용합니다. 긴 문맥의 통계가 부족할 때 더 짧은 문맥의 통계를 함께 활용하는 방법도 있습니다.
 
+### 코드로 보기: 바이그램 확률과 문장 생성
+
+아래 예제는 단어가 연속해서 등장한 횟수를 세고, ‘커피를’ 다음에 나올 단어의 확률을 계산합니다. 이어서 등장 횟수를 가중치로 사용해 짧은 문장을 만듭니다. Python 기본 라이브러리만 사용합니다.
+
+```python
+from collections import Counter, defaultdict
+import random
+
+sentences = [
+    "나는 커피를 마신다",
+    "너는 커피를 마신다",
+    "나는 커피를 만든다",
+    "나는 차를 마신다",
+]
+
+next_words = defaultdict(Counter)
+for sentence in sentences:
+    words = sentence.split()
+    for current, following in zip(words, words[1:]):
+        next_words[current][following] += 1
+
+counts = next_words["커피를"]
+total = sum(counts.values())
+for word, count in counts.items():
+    print(f"P({word} | 커피를) = {count / total:.2f}")
+
+random.seed(42)
+generated = ["나는"]
+while len(generated) < 6:
+    options = next_words.get(generated[-1])
+    if not options:  # 뒤에 이어질 단어가 없으면 종료
+        break
+    word = random.choices(
+        list(options), weights=list(options.values()), k=1
+    )[0]
+    generated.append(word)
+print("생성:", " ".join(generated))
+```
+
+`커피를` 다음에 ‘마신다’는 두 번, ‘만든다’는 한 번 등장하므로 각각 약 0.67과 0.33이 출력됩니다. 생성 결과는 무작위 선택에 따라 달라질 수 있습니다. 실제 모델에서는 더 큰 데이터와 문장 경계, 미등록 단어, 스무딩 등을 고려해야 합니다.
+
 <a id="perplexity"></a>
 ## 3. 언어 모델 평가하기: 퍼플렉서티
 
@@ -80,6 +123,24 @@ ChatGPT 이전에는 기계가 문장을 어떻게 이해하고 만들어 냈을
 매번 10개의 후보를 똑같이 가능하다고 보는 단순한 경우 퍼플렉서티는 10입니다. 실제 모델에서는 문맥마다 확률 분포가 달라지므로 언제나 후보의 개수로 그대로 해석해서는 안 됩니다.
 
 > **비교할 때 주의:** 서로 다른 데이터셋이나 서로 다른 토큰화 방식으로 계산한 퍼플렉서티는 단순 비교하기 어렵습니다. 단어 단위인지 문자 단위인지도 확인해야 합니다.
+
+### 코드로 보기: 정답 확률로 퍼플렉서티 계산하기
+
+정답 토큰 세 개에 모델이 각각 0.5, 0.25, 0.5의 확률을 주었다고 가정합니다. 다음 계산은 자연로그를 사용하며, 정답 확률은 0보다 커야 합니다.
+
+```python
+import math
+
+correct_probabilities = [0.5, 0.25, 0.5]
+mean_negative_log = -sum(
+    math.log(p) for p in correct_probabilities
+) / len(correct_probabilities)
+
+perplexity = math.exp(mean_negative_log)
+print(f"퍼플렉서티: {perplexity:.2f}")  # 약 2.52
+```
+
+정답에 주는 확률이 높아지면 퍼플렉서티는 낮아집니다. 이는 원리를 보여 주는 작은 예시이며 실제 평가는 같은 전처리와 토큰화 조건에서 전체 평가 데이터로 진행합니다.
 
 <a id="bow"></a>
 ## 4. 문장을 숫자로 바꾸기: Bag of Words
@@ -94,6 +155,37 @@ ChatGPT 이전에는 기계가 문장을 어떻게 이해하고 만들어 냈을
 전체 단어 목록을 `[고양이, 강아지, 생선, 고기, 좋아하다]`로 정하면 A는 `[1, 0, 1, 0, 1]`, B는 `[0, 1, 0, 1, 1]`로 표현할 수 있습니다. 각 숫자는 단어의 등장 여부나 횟수를 나타냅니다.
 
 BoW는 스팸 분류처럼 단어의 존재가 중요한 문제에서 유용할 수 있지만, 단어의 **순서**를 잃고 비슷한 의미의 단어도 별개의 차원으로 취급합니다. 단어 종류가 많으면 벡터는 크고 대부분의 값이 0인 희소 벡터가 됩니다.
+
+### 코드로 보기: BoW와 영화 리뷰 분류
+
+먼저 `pip install scikit-learn`으로 라이브러리를 설치하세요. 아래 코드는 작은 영화 리뷰로 단어 빈도 벡터를 만들고, 로지스틱 회귀 분류기를 학습합니다.
+
+```python
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.linear_model import LogisticRegression
+
+reviews = [
+    "영화 정말 재미있다",
+    "연기 좋고 재미있다",
+    "영화 정말 지루하다",
+    "연기 별로고 지루하다",
+]
+labels = [1, 1, 0, 0]  # 1: 긍정, 0: 부정
+
+vectorizer = CountVectorizer()
+X = vectorizer.fit_transform(reviews)
+print("단어 목록:", vectorizer.get_feature_names_out())
+print("첫 리뷰 벡터:", X[0].toarray()[0])
+
+classifier = LogisticRegression(random_state=0)
+classifier.fit(X, labels)
+
+new_review = ["영화 재미있다"]
+prediction = classifier.predict(vectorizer.transform(new_review))[0]
+print("예측:", "긍정" if prediction == 1 else "부정")
+```
+
+첫 번째 리뷰는 단어 목록에서 해당 단어가 나타난 위치에 1이 들어갑니다. 이 코드는 동작 원리를 살펴보기 위한 초소형 예제입니다. 실제 성능을 평가하려면 IMDB처럼 충분한 데이터로 학습하고 **학습에 쓰지 않은 데이터**에서 정확도를 측정해야 합니다. 기본 토큰화는 한국어 형태소 분석을 수행하지 않는다는 점도 기억해 두세요.
 
 <a id="embeddings"></a>
 ## 5. 단어의 의미 관계 담기: 임베딩
@@ -117,6 +209,29 @@ BoW는 스팸 분류처럼 단어의 존재가 중요한 문제에서 유용할 
 
 또 임베딩은 학습 데이터에 담긴 편향을 반영할 수 있으므로 벡터의 거리를 객관적인 진실로 받아들여서는 안 됩니다.
 
+### 코드로 보기: 코사인 유사도로 벡터 비교하기
+
+두 벡터의 방향이 비슷한지 볼 때 **코사인 유사도**를 사용할 수 있습니다. 아래 벡터는 학습된 임베딩이 아니라 계산을 설명하기 위한 가상 숫자입니다.
+
+```python
+import math
+
+def cosine_similarity(a, b):
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = math.sqrt(sum(x * x for x in a))
+    norm_b = math.sqrt(sum(y * y for y in b))
+    return dot / (norm_a * norm_b)
+
+cat = [0.8, 0.2, 0.7]
+dog = [0.7, 0.3, 0.8]
+car = [0.1, 0.9, 0.2]
+
+print(f"고양이·강아지: {cosine_similarity(cat, dog):.3f}")
+print(f"고양이·자동차: {cosine_similarity(cat, car):.3f}")
+```
+
+이 예제에서는 고양이와 강아지 벡터가 더 비슷한 방향을 가리킵니다. 실제 임베딩에서는 벡터를 모델이 데이터로부터 학습합니다. 위 함수는 길이가 같고 크기가 0이 아닌 벡터를 입력받는다고 가정합니다.
+
 <a id="rnn"></a>
 ## 6. 순서를 고려하기: RNN과 LSTM
 
@@ -139,6 +254,28 @@ hₜ = f(Wₓxₜ + Wₕhₜ₋₁ + b)
 **LSTM**과 **GRU**는 이런 문제를 완화하기 위해 만들어진 RNN 계열 모델입니다. LSTM은 게이트 구조를 사용해 어떤 정보를 기억하고 잊을지, 어떤 정보를 내보낼지 조절합니다. 긴 의존 관계의 학습에 도움을 주지만 모든 문맥을 완벽하게 기억하는 것은 아닙니다.
 
 RNN은 기본적으로 이전 상태를 계산해야 다음 상태를 계산할 수 있으므로, 긴 문장을 학습할 때 병렬 처리에도 제약이 있습니다.
+
+### 코드로 보기: RNN 상태 한 단계씩 갱신하기
+
+이 예제는 라이브러리 없이 작은 RNN의 계산 흐름을 보여 줍니다. 가중치는 임의로 정한 값이며 모델을 학습하지 않습니다.
+
+```python
+import math
+
+inputs = [1.0, 0.5, -0.2]  # 입력 벡터 대신 숫자 하나로 단순화
+input_weight = 0.8
+state_weight = 0.5
+bias = 0.0
+state = 0.0  # 초기 은닉 상태
+
+for step, current_input in enumerate(inputs, start=1):
+    state = math.tanh(
+        input_weight * current_input + state_weight * state + bias
+    )
+    print(f"{step}단계 은닉 상태: {state:.3f}")
+```
+
+각 단계에서 **현재 입력과 이전 단계의 상태**가 함께 사용됩니다. 실제 RNN은 일반적으로 다차원 벡터와 행렬을 사용하고, 학습으로 가중치를 조정합니다. LSTM은 여기에 별도의 셀 상태와 게이트를 더합니다.
 
 <a id="pretraining"></a>
 ## 7. 언어 지식 재사용하기: 사전학습과 미세조정
@@ -177,6 +314,33 @@ cₜ = Σᵢ αₜ,ᵢ hᵢ
 **셀프 어텐션(self-attention)**은 한 문장 안의 각 위치가 다른 위치의 정보를 참고하도록 합니다. 예를 들어 ‘민지는 지수에게 책을 빌려주었다. 그녀는 고맙다고 말했다’에서 ‘그녀’가 누구를 가리키는지 살피려면 앞에 등장한 인물과 문맥을 함께 고려해야 합니다.
 
 각 위치는 다른 위치의 정보를 가중합해 새 표현을 만듭니다. 실제 트랜스포머는 여러 어텐션 헤드와 여러 층을 사용합니다. 단어의 순서도 구분할 수 있도록 **위치 정보**를 함께 제공합니다.
+
+### 코드로 보기: 작은 셀프 어텐션 계산
+
+`pip install numpy`가 필요합니다. 아래 예제는 토큰 세 개의 2차원 벡터로 단일 헤드 어텐션의 계산 과정을 보여 줍니다. 이해를 위해 Q, K, V를 같은 입력으로 두고, 학습 가능한 변환과 위치 정보, 마스크는 생략했습니다.
+
+```python
+import numpy as np
+
+tokens = np.array([
+    [1.0, 0.0],  # 토큰 A
+    [0.0, 1.0],  # 토큰 B
+    [1.0, 1.0],  # 토큰 C
+])
+Q = K = V = tokens
+
+# 각 토큰의 쿼리와 모든 키를 비교하고 차원 크기로 나눕니다.
+scores = Q @ K.T / np.sqrt(K.shape[-1])
+exp_scores = np.exp(scores - scores.max(axis=1, keepdims=True))
+weights = exp_scores / exp_scores.sum(axis=1, keepdims=True)
+output = weights @ V
+
+print("어텐션 가중치:\n", np.round(weights, 3))
+print("새로운 토큰 표현:\n", np.round(output, 3))
+print("각 행의 합:", np.round(weights.sum(axis=1), 3))
+```
+
+가중치 행렬의 **각 행은 하나의 토큰이 다른 토큰을 얼마나 참고하는지** 나타내며 각 행의 합은 1입니다. 실제 모델에서는 Q·K·V에 학습 가능한 선형 변환을 적용하고 여러 헤드와 층을 사용합니다. GPT처럼 다음 토큰을 예측할 때는 미래 토큰을 볼 수 없도록 마스크도 적용합니다.
 
 트랜스포머는 RNN보다 학습 중 여러 위치의 계산을 병렬화하기 쉽습니다. 다만 자기회귀 방식의 텍스트 생성에서는 새 토큰을 만든 뒤 다음 토큰을 생성하므로 출력 과정의 순차성은 남아 있습니다.
 
