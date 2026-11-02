@@ -1,0 +1,120 @@
+{
+  "torch": "2.15.0+cpu",
+  "seed": 45,
+  "steps": 1200,
+  "parameters": 58572,
+  "seconds": 11.154266782999912,
+  "history": [
+    {
+      "step": 0,
+      "train_loss": 2.7159581184387207,
+      "loss": 2.7188758850097656,
+      "perplexity": 15.163267135620117,
+      "accuracy": 0.3125
+    },
+    {
+      "step": 100,
+      "train_loss": 0.4580225944519043,
+      "loss": 0.7842285633087158,
+      "perplexity": 2.19071626663208,
+      "accuracy": 0.9375
+    },
+    {
+      "step": 200,
+      "train_loss": 0.42909547686576843,
+      "loss": 0.8062182068824768,
+      "perplexity": 2.2394230365753174,
+      "accuracy": 1.0
+    },
+    {
+      "step": 300,
+      "train_loss": 0.42891910672187805,
+      "loss": 0.8691020011901855,
+      "perplexity": 2.38476824760437,
+      "accuracy": 1.0
+    },
+    {
+      "step": 400,
+      "train_loss": 0.42244911193847656,
+      "loss": 0.8924153447151184,
+      "perplexity": 2.4410183429718018,
+      "accuracy": 1.0
+    },
+    {
+      "step": 500,
+      "train_loss": 0.4218643307685852,
+      "loss": 0.9441310167312622,
+      "perplexity": 2.5705785751342773,
+      "accuracy": 1.0
+    },
+    {
+      "step": 600,
+      "train_loss": 0.4195125102996826,
+      "loss": 0.9696786403656006,
+      "perplexity": 2.637096881866455,
+      "accuracy": 1.0
+    },
+    {
+      "step": 700,
+      "train_loss": 0.4255647659301758,
+      "loss": 0.9297133684158325,
+      "perplexity": 2.533782720565796,
+      "accuracy": 1.0
+    },
+    {
+      "step": 800,
+      "train_loss": 0.4203868508338928,
+      "loss": 0.9651301503181458,
+      "perplexity": 2.625129222869873,
+      "accuracy": 1.0
+    },
+    {
+      "step": 900,
+      "train_loss": 0.42047572135925293,
+      "loss": 0.9259970188140869,
+      "perplexity": 2.524383783340454,
+      "accuracy": 1.0
+    },
+    {
+      "step": 1000,
+      "train_loss": 0.41902923583984375,
+      "loss": 0.9628453850746155,
+      "perplexity": 2.619138240814209,
+      "accuracy": 1.0
+    },
+    {
+      "step": 1100,
+      "train_loss": 0.4199540913105011,
+      "loss": 0.9854424595832825,
+      "perplexity": 2.678997039794922,
+      "accuracy": 1.0
+    },
+    {
+      "step": 1200,
+      "train_loss": 0.4192083775997162,
+      "loss": 0.9870946407318115,
+      "perplexity": 2.683426856994629,
+      "accuracy": 1.0
+    }
+  ],
+  "train_sequences": 42,
+  "val_sequences": 16,
+  "test_sequences": 14,
+  "best_step": 100,
+  "best_validation": {
+    "loss": 0.7842285633087158,
+    "perplexity": 2.19071626663208,
+    "accuracy": 0.9375
+  },
+  "test": {
+    "loss": 0.7799512147903442,
+    "perplexity": 2.181365728378296,
+    "accuracy": 1.0
+  },
+  "generations": [
+    "<BOS> A 0 B 1 ASK A ANS 0 <EOS>",
+    "<BOS> A 0 B 1 ASK B ANS 1 <EOS>",
+    "<BOS> A 1 B 0 ASK A ANS 1 <EOS>",
+    "<BOS> A 1 B 0 ASK B ANS 0 <EOS>"
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "torch": "2.15.0+cpu",
+  "seed": 42,
+  "scale": true,
+  "seconds": 1.1689187500014668,
+  "history": [
+    {
+      "step": 0,
+      "loss": 1.8291043043136597,
+      "accuracy": 0.14501953125,
+      "retrieval_accuracy": 0.13720703125
+    },
+    {
+      "step": 100,
+      "train_loss": 0.001307103200815618,
+      "loss": 0.0013467721873894334,
+      "accuracy": 1.0,
+      "retrieval_accuracy": 1.0
+    },
+    {
+      "step": 200,
+      "train_loss": 0.0006585246883332729,
+      "loss": 0.0006566409720107913,
+      "accuracy": 1.0,
+      "retrieval_accuracy": 1.0
+    },
+    {
+      "step": 300,
+      "train_loss": 0.00039664129144512117,
+      "loss": 0.0003926863137166947,
+      "accuracy": 1.0,
+      "retrieval_accuracy": 1.0
+    },
+    {
+      "step": 400,
+      "train_loss": 0.00026330878608860075,
+      "loss": 0.00026474971673451364,
+      "accuracy": 1.0,
+      "retrieval_accuracy": 1.0
+    },
+    {
+      "step": 500,
+      "train_loss": 0.00020274111011531204,
+      "loss": 0.00019239293760620058,
+      "accuracy": 1.0,
+      "retrieval_accuracy": 1.0
+    },
+    {
+      "step": 600,
+      "train_loss": 0.00015035641263239086,
+      "loss": 0.0001476042380090803,
+      "accuracy": 1.0,
+      "retrieval_accuracy": 1.0
+    },
+    {
+      "step": 700,
+      "train_loss": 0.00011777046165661886,
+      "loss": 0.00011793968587880954,
+      "accuracy": 1.0,
+      "retrieval_accuracy": 1.0
+    }
+  ],
+  "uniform_intervention": {
+    "loss": 1.576497197151184,
+    "accuracy": 0.4267578125,
+    "retrieval_accuracy": 0.2119140625
+  }
+}
