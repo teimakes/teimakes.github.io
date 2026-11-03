@@ -20,7 +20,11 @@ Python의 함수, 딕셔너리와 JSON 파일을 읽을 수 있으면 따라갈 
 - [두 방식에서 달라지는 것](#approaches)
 - [실험에 사용할 문서와 질문](#dataset)
 - [같은 조건으로 비교하기](#design)
-- [검색과 생성 입력을 만드는 코드](#implementation)
+- [실험 코드의 전체 흐름](#implementation)
+- [문단 분리와 BM25 검색](#code-chunks)
+- [메시지 구성과 두 방식의 요청 만들기](#code-request)
+- [실행 계획과 예산 관리](#code-plan)
+- [API 응답 검증과 결과 저장](#code-response)
 - [정답과 근거를 따로 평가하는 이유](#evaluation)
 - [12문항의 실제 결과](#results)
 - [답변이 달라진 할인 계산 문제](#failure)
@@ -96,63 +100,501 @@ RAG에 벡터 데이터베이스나 임베딩 모델이 반드시 필요한 것�
 이 형식을 고정하면 “십이만 원”과 “120,000원”처럼 표기가 다른 답변을 문자열 그대로 비교하는 문제를 줄일 수 있습니다. 대신 설명 전체가 정확한지는 별도의 검토가 필요합니다.
 
 <a id="implementation"></a>
-## 검색과 생성 입력을 만드는 코드
+## 실험 코드의 전체 흐름
 
-실험 코드의 역할은 세 부분으로 나뉩니다. `retrieval.py`는 문단을 나누고 검색합니다. `prompts.py`는 선택된 문맥과 질문을 메시지로 만듭니다. `experiment.py`는 같은 조건으로 요청을 보내고 응답·사용량·시간·채점 결과를 저장합니다.
+이 실험에서 가장 긴 파일은 310줄의 `experiment.py`입니다. 문서를 검색하고 답변을 받는 과정에 더해 실행 조건 검증, 예산 예약, 응답 파싱, 채점과 파일 저장을 담당합니다. 검색 자체는 41줄의 `retrieval.py`에 들어 있습니다. 두 파일을 나눠 읽으면 RAG의 계산과 실험을 관리하는 코드를 구분하기 쉽습니다.
 
-### 문단을 어떤 단위로 검색할까?
+| 파일 | 주요 함수·클래스 | 입력 → 결과 |
+|---|---|---|
+| `retrieval.py` | `chunks()`, `tokens()`, `BM25` | 원문과 질문 → 선택한 문단 |
+| `prompts.py` | `messages()` | 문맥과 질문 → 모델에 보낼 메시지 |
+| `scoring.py` | `Answer`, `check_fields()` | 생성 JSON과 기준 정답 → 검증된 답변과 정답 일치 여부 |
+| `experiment.py` | `jobs()`, `plan()`, `run()` | 설정과 데이터 → 실행 계획 또는 실제 응답 기록 |
+| `analysis/cache_costs.py` | `priced()`, `aggregate()` | 저장된 API 사용량 → 캐시를 반영한 비용 |
+| `review.py` | 검토 CSV 집계 | 사람이 채운 검토 칸 → 검토율과 점수 |
 
-이번에는 일정한 글자 수로 자르지 않고 A02, A10 같은 문단 ID를 경계로 나눴습니다. 가격표와 규정 한 항목이 검색 단위가 됩니다. 청크 크기와 겹침을 여러 값으로 조절하는 실험은 하지 않았습니다.
+`experiment.py`의 명령은 `plan`과 `run`으로 나뉩니다. **`plan`은 검색과 요청 구성을 수행하지만 API에 보내지 않습니다.** `run`은 저장된 계획을 검증한 다음 요청을 전송합니다. 두 명령이 같은 `jobs()`를 사용하므로 계획할 때와 실행할 때 문맥을 만드는 규칙이 같습니다.
 
-검색에 사용하는 토큰은 생성 모델의 과금 토큰과 다릅니다. BM25에서는 영문·숫자 묶음과 한글 어절을 추출하고, 한글 어절 내부의 두 글자 조합을 추가합니다. 예를 들어 ‘수강료’에서는 ‘수강’과 ‘강료’도 검색 단위로 사용합니다. 형태소 분석기를 설치하지 않고 부분적인 문자열 일치를 활용하기 위한 단순한 처리입니다. 의미가 비슷하지만 표현이 다른 문장을 이해하는 검색은 아닙니다.
+실행 순서는 다음과 같습니다.
 
-BM25는 질문의 검색 단위가 각 문단에 얼마나 나타나는지 계산합니다. 모든 문단에 흔한 표현보다 일부 문단에 나타나는 표현에 높은 가중치를 주고, 같은 표현의 반복 횟수와 문단 길이도 반영합니다. 질문에 있는 표현을 많이 포함한 문단이 높은 점수를 받을 수 있지만, 그 문단이 계산에 필요한 근거를 모두 갖췄다는 뜻은 아닙니다.
+1. 설정과 질문을 읽고 문단 검색 인덱스를 만듭니다.
+2. 질문마다 `full`과 `rag`의 요청을 만듭니다.
+3. `plan`에서는 요청별 해시와 비용 예약액을 저장합니다.
+4. `run`에서는 계획·계정·예산을 확인하고 요청을 보냅니다.
+5. 응답에서 사용량과 답변을 꺼내 검증하고 채점합니다.
+6. 문항별 기록을 저장한 뒤 방식별 결과를 집계합니다.
 
-다음 코드는 두 방식의 입력이 어떻게 달라지는지 보여 줍니다. 공개된 실험 폴더에서 실행하면 검색과 프롬프트 구성만 수행하며 API를 호출하지 않습니다.
+아래 코드는 공개된 소스의 주요 함수를 따라갑니다. 읽기 쉽도록 줄을 나누고 주석과 docstring을 덧붙였으며, 계산과 조건은 원래 함수와 같습니다. 함수 블록은 전체 파일의 일부입니다. 실제 실행에는 블록을 각각 복사하기보다 [공개된 실험 폴더](https://github.com/teimakes/teimakes.github.io/tree/main/public/qa-comparison)를 사용하세요.
 
-```python
-from pathlib import Path
-from retrieval import BM25, chunks
-from prompts import messages
+### 1. 질문 한 개에는 어떤 정보가 들어 있을까?
 
+`data/dev.jsonl`은 한 줄에 JSON 객체 하나를 저장합니다. 첫 질문은 다음과 같습니다.
 
-def make_inputs(document, question):
-    """같은 질문에 대해 전체 문맥과 검색 문맥의 메시지를 만듭니다.
-
-    chunks()는 문단 ID가 시작되는 위치에서 원문을 나눕니다.
-    BM25는 각 문단의 검색 토큰 빈도와 길이를 저장합니다.
-    search()에는 질문과 가져올 문단 수만 전달합니다.
-    기준 답변과 근거 ID는 이 함수의 입력에 포함되지 않습니다.
-
-    검색 점수로 다섯 문단을 선택하되, 선택된 문단은 원문 순서로
-    제공합니다. 문단 순서를 바꾸는 효과가 함께 섞이지 않게 합니다.
-    두 메시지 모두 같은 grounded 지침과 같은 질문을 사용합니다.
-    """
-    paragraphs = chunks(document)
-    index = BM25(paragraphs)
-    selected = index.search(question, k=5)
-    retrieved_text = "\n\n".join(p["text"] for p in selected)
-
-    return {
-        "full": messages(document, question, "grounded"),
-        "rag": messages(retrieved_text, question, "grounded"),
-    }
-
-
-document = Path("data/handbook.txt").read_text(encoding="utf-8")
-inputs = make_inputs(document, "G01 정가를 원 단위 숫자로 알려주세요.")
-print(inputs["rag"])
+```json
+{
+  "id": "dev-01",
+  "category": "numeric",
+  "question": "G01 정가를 원 단위 숫자로 알려주세요.",
+  "expected": {"verdict": "value", "value": 120000},
+  "reference_answer": "G01 전체 수강료는 부가세 포함 120,000원입니다.",
+  "sources": ["A02"]
+}
 ```
 
-이 예제는 두 입력을 만드는 데 집중했습니다. 실제 실행기는 인덱스를 한 번 만든 뒤 모든 질문에서 재사용합니다. 검색 인덱스를 만드는 시간과 질문별 검색 시간도 따로 기록합니다.
+`id`는 같은 질문의 두 답변을 연결하는 키입니다. `question`은 검색기와 생성 모델이 받는 질문입니다. `expected`는 기계적으로 비교할 정답이고, `reference_answer`는 사람이 답변을 검토할 때 읽는 기준 문장입니다. `sources`는 기준 근거 ID입니다.
 
-### 실행하기 전에 호출 수와 예산을 고정하기
+실행기 내부에서는 이 객체 전체를 `case`로 보관합니다. 하지만 API에 보내는 `request`를 만들 때는 `case['question']`만 꺼냅니다. 기준 정답이 실행기의 메모리에 있다는 사실과 모델의 입력에 들어간다는 사실은 다릅니다. 아래 `jobs()`와 `payload()`를 읽을 때 이 경계를 확인할 수 있습니다.
 
-`experiment.py plan`은 실행할 요청들을 먼저 구성하고 모델, 데이터, 코드와 요청 내용을 해시로 기록합니다. 계획을 만든 뒤 프롬프트나 데이터가 바뀌면 같은 계획으로 실행할 수 없습니다. 그래야 결과를 얻은 뒤 어떤 조건으로 실행했는지 되짚을 수 있습니다.
+`load_cases(split)`은 `dev` 또는 `holdout` 파일을 읽고 빈 줄을 제외한 각 줄에 `json.loads()`를 적용합니다. `ROOT`는 `experiment.py`가 있는 폴더의 절대 경로이므로, 문서와 질문은 실행 명령을 입력한 위치가 아니라 코드 파일의 위치를 기준으로 찾습니다.
 
-각 호출 전에는 입력 추정량과 최대 출력량으로 계산한 비용을 원장에 예약합니다. 타임아웃이 나면 서버에서 처리됐는지 확실하지 않을 수 있으므로 예약을 자동으로 돌려주지 않습니다. 같은 계획의 같은 문항도 자동 재전송하지 않습니다.
+<a id="code-chunks"></a>
+### 2. `chunks()`와 `tokens()`: 원문을 검색 가능한 단위로 바꾸기
 
-이번 첫 단계의 로컬 비용 상한은 0.25달러였습니다. 이 장치는 해당 실행기의 예약액 합계를 관리하며, 다른 프로그램이 같은 계정에서 사용하는 비용까지 제한하지는 않습니다.
+`chunks()`는 문단 ID가 시작되는 위치를 찾고, 그 위치부터 다음 ID 직전까지를 하나의 청크로 묶습니다. 다음 두 함수에는 `re` 모듈을 사용합니다.
+
+```python
+def chunks(document):
+    """문단 ID와 그 문단의 텍스트를 함께 반환합니다.
+
+    ^는 줄의 시작, [ABC]는 문단 종류, 두 자리 숫자는 문단 번호입니다.
+    re.M을 지정해 문서 전체에서 각 줄의 시작을 검사합니다.
+    한 문단의 끝은 다음 ID의 시작이며 마지막 문단은 원문 끝까지입니다.
+    """
+    starts = list(re.finditer(r'^([ABC]\d{2}) ', document, re.M))
+    if not starts:
+        raise ValueError('No paragraph IDs found')
+    return [
+        {
+            'id': m.group(1),
+            'text': document[
+                m.start():starts[i + 1].start()
+                if i + 1 < len(starts) else len(document)
+            ].strip(),
+        }
+        for i, m in enumerate(starts)
+    ]
+
+
+def tokens(text):
+    """BM25에 사용할 단어와 한글 어절 내부의 두 글자 조합을 만듭니다.
+
+    영문은 소문자로 통일하고 영문·숫자 묶음과 한글 어절을 추출합니다.
+    한글 어절에는 연속한 두 글자를 추가해 부분적인 일치도 반영합니다.
+    반환값은 생성 모델의 과금 토큰과 관계없는 검색용 문자열 목록입니다.
+    """
+    words = re.findall(r'[a-z0-9]+|[가-힣]+', text.lower())
+    return words + [
+        w[i:i + 2]
+        for w in words
+        if re.fullmatch('[가-힣]+', w)
+        for i in range(len(w) - 1)
+    ]
+```
+
+청크에는 `id`와 `text`를 따로 저장하지만 `text`에도 A02 같은 ID가 남습니다. 생성 모델이 해당 문단을 인용할 때 사용할 수 있도록 원문에서 제거하지 않은 것입니다. 원문 맨 앞의 제목처럼 첫 ID 이전의 내용은 RAG 청크에 포함되지 않습니다. 문단 사이에 있는 페이지 표시는 해당 청크에 남습니다. 전체 문맥 방식에는 원문을 그대로 전달합니다.
+
+`tokens('G02 수강료')`의 결과는 `['g02', '수강료', '수강', '강료']`입니다. 문단과 질문에 같은 함수를 적용하므로 같은 단위로 비교할 수 있습니다. 형태소 분석은 하지 않으며, 예를 들어 의미만 비슷하고 문자열이 다른 표현까지 연결해 주는 방법은 아닙니다.
+
+### 3. `BM25`: 문단 점수를 계산하고 다섯 개 선택하기
+
+`BM25.__init__()`는 매 질문마다 다시 계산할 필요가 없는 문단 통계를 저장합니다. `Counter`, `math`와 앞의 `tokens()`를 사용합니다.
+
+```python
+class BM25:
+    """문단별 빈도와 문단 길이를 이용하는 로컬 검색기입니다."""
+
+    def __init__(self, paragraphs):
+        """문단을 보관하고 검색 점수 계산에 필요한 통계를 만듭니다.
+
+        counts[i]는 i번째 문단에서 각 검색 토큰이 등장한 횟수입니다.
+        lengths는 문단별 검색 토큰 수, avg는 그 평균입니다.
+        df는 각 토큰이 등장한 문단 수입니다. 한 문단에서 같은 토큰이
+        여러 번 나와도 df에는 한 번만 반영됩니다.
+        """
+        self.paragraphs = paragraphs
+        self.counts = [Counter(tokens(p['text'])) for p in paragraphs]
+        self.lengths = [sum(c.values()) for c in self.counts]
+        self.avg = sum(self.lengths) / len(self.lengths)
+        self.df = Counter(t for c in self.counts for t in c)
+
+    def search(self, question, k=5):
+        """질문과 각 문단의 점수를 계산해 상위 k개를 선택합니다.
+
+        query는 집합이므로 질문 속 같은 토큰의 반복 횟수는 무시합니다.
+        f는 현재 문단의 토큰 빈도입니다. 토큰이 없는 문단에서는 그
+        토큰의 점수를 더하지 않습니다. 점수 동률은 원문 순서로 풉니다.
+        선택이 끝나면 선택된 문단을 다시 원문 순서로 반환합니다.
+        """
+        query = set(tokens(question))
+        scores = []
+        for i, c in enumerate(self.counts):
+            score = 0.0
+            for t in query:
+                f = c[t]
+                if f:
+                    idf = math.log(
+                        1 + (len(self.counts) - self.df[t] + 0.5)
+                        / (self.df[t] + 0.5)
+                    )
+                    score += idf * f * 2.5 / (
+                        f + 1.5 * (
+                            0.25 + 0.75 * self.lengths[i] / self.avg
+                        )
+                    )
+            scores.append((i, score))
+
+        chosen = sorted(scores, key=lambda x: (-x[1], x[0]))[:k]
+        return [
+            dict(self.paragraphs[i], retrieval_score=s)
+            for i, s in sorted(chosen)
+        ]
+```
+
+`df`와 `counts`는 역할이 다릅니다. ‘할인’이 한 문단에서 다섯 번 등장했다면 그 문단의 `counts['할인']`은 5입니다. 하지만 그 문단이 `df['할인']`에 더하는 값은 1입니다. 앞의 값은 해당 문단에서 얼마나 반복됐는지, 뒤의 값은 전체 문단에 얼마나 널리 퍼져 있는지를 나타냅니다.
+
+`idf`는 많은 문단에 공통으로 나타나는 표현의 비중을 낮춥니다. 빈도 항은 같은 토큰이 반복될 때 점수를 높이되 증가 폭이 점차 작아지게 하고, `self.lengths[i] / self.avg`는 문단 길이 차이를 반영합니다. 코드의 1.5는 k1, 0.75는 b이고, 2.5는 k1+1, 0.25는 1−b입니다.
+
+마지막 두 정렬도 구분해야 합니다. 첫 정렬은 `(-점수, 원문 위치)`를 사용해 검색할 문단을 선택합니다. 두 번째 정렬은 이미 선택한 문단의 원문 위치를 기준으로 합니다. 모델에 제공하는 순서를 검색 점수순으로 바꾸지 않기 위한 처리입니다.
+
+이 구현에는 최소 점수 기준이 없습니다. 모든 문단의 점수가 낮더라도 최대 k개를 반환합니다. 또 `set()`으로 만든 질문 토큰의 순회 순서는 프로세스에 따라 달라질 수 있어 부동소수점 덧셈의 극히 작은 차이까지 항상 같다고 보장하지는 않습니다. 실제 결과의 `provided_ids`를 저장하는 이유 중 하나입니다. 큰 문서 집합에 적용하려면 검색 효율과 순위 안정성도 별도로 검토해야 합니다.
+
+<a id="code-request"></a>
+### 4. `messages()`와 `payload()`: 모델에 보내는 경계 확인하기
+
+검색기가 반환한 문단을 받으면 `messages()`가 지침과 사용자 입력을 만듭니다. `PROMPTS`에는 `baseline`과 `grounded`가 있지만, 이번 실행은 두 방식 모두 `grounded`를 사용합니다.
+
+```python
+def messages(document, question, variant):
+    """지침과 문서·질문을 두 메시지로 나눕니다.
+
+    system에는 선택한 지침을, user에는 문서와 질문을 넣습니다.
+    expected, reference_answer와 기준 sources를 받는 인자는 없습니다.
+    document 태그는 텍스트 경계 표시이며 별도의 보안 장치는 아닙니다.
+    """
+    return [
+        {"role": "system", "content": PROMPTS[variant]},
+        {
+            "role": "user",
+            "content": f"<document>\n{document}\n</document>\n질문: {question}",
+        },
+    ]
+
+
+def payload(c, document, question):
+    """같은 모델 설정과 출력 스키마를 사용한 API 요청 본문을 만듭니다.
+
+    c는 config.json에서 읽은 설정입니다. 두 방식의 차이는 document에
+    들어가는 텍스트뿐입니다. SCHEMA는 experiment.py 상단의 JSON 스키마로
+    answer, verdict, value, sources 네 필드와 각 필드의 자료형을 지정합니다.
+    """
+    return {
+        'model': c['model'],
+        'input': messages(document, question, 'grounded'),
+        'reasoning': {'effort': c['reasoning_effort']},
+        'max_output_tokens': c['max_output_tokens'],
+        'store': False,
+        'service_tier': 'default',
+        'text': {
+            'format': {
+                'type': 'json_schema',
+                'name': 'qa_answer',
+                'strict': True,
+                'schema': SCHEMA,
+            }
+        },
+    }
+```
+
+`SCHEMA`는 네 필드를 필수로 요구하고 추가 필드를 허용하지 않습니다. `verdict`의 값은 정해진 네 종류로 제한하고 `value`는 숫자 또는 null로 지정합니다. 생성 형식을 제한하는 것만으로 답의 정확성이 보장되지는 않습니다. 예를 들어 형식에 맞는 `value: 180000`도 정답이 153000인 질문에서는 오답입니다.
+
+인증값은 `payload()`가 반환하는 딕셔너리에 들어가지 않습니다. 나중에 `complete()`가 HTTP 헤더를 만들 때 환경 변수에서 읽습니다. 따라서 저장된 `request`에서는 모델이 실제로 받은 문맥을 확인할 수 있습니다.
+
+<a id="code-jobs"></a>
+### 5. `jobs()`: 질문 하나를 두 방식의 요청으로 펼치기
+
+`jobs()`는 `yield`를 사용하는 제너레이터입니다. 요청을 하나씩 반환하지만 직접 전송하지 않습니다. 아래는 이 함수 전체입니다.
+
+```python
+def jobs(c, split, limit, repeats):
+    """문서와 질문을 읽어 full/rag 요청을 순서대로 반환합니다.
+
+    인덱스는 이 제너레이터를 순회하기 시작할 때 한 번 만듭니다.
+    limit=0이면 질문 전체를 사용하고, 양수이면 앞의 limit개만 사용합니다.
+    repeat는 같은 질문을 몇 번째 반복하는지 나타내는 0부터의 인덱스입니다.
+
+    반환 객체의 case는 로컬 채점을 위한 자료입니다. API 전송 대상은
+    request뿐이며, 그 안에는 선택한 문맥과 question만 들어갑니다.
+    provided_ids는 실제 제공한 문단을 나중에 확인하기 위한 기록입니다.
+    """
+    document = (ROOT / 'data/handbook.txt').read_text(encoding='utf-8')
+    paragraphs = chunks(document)
+    index_start = time.perf_counter()
+    index = BM25(paragraphs)
+    index_s = time.perf_counter() - index_start
+    cases = load_cases(split)
+    if limit:
+        cases = cases[:limit]
+
+    for repeat in range(repeats):
+        for i, case in enumerate(cases):
+            start = time.perf_counter()
+            selected = index.search(case['question'], c['top_k'])
+            retrieval_s = time.perf_counter() - start
+            arms = ['full', 'rag'] if (i + repeat) % 2 == 0 else ['rag', 'full']
+            for arm in arms:
+                context = document if arm == 'full' else '\n\n'.join(
+                    p['text'] for p in selected
+                )
+                yield {
+                    'key': f"{case['id']}:{repeat}:{arm}",
+                    'arm': arm,
+                    'repeat': repeat,
+                    'case': case,
+                    'provided_ids': [
+                        p['id'] for p in (paragraphs if arm == 'full' else selected)
+                    ],
+                    'retrieval_s': retrieval_s if arm == 'rag' else 0.0,
+                    'index_build_s': index_s if arm == 'rag' else 0.0,
+                    'request': payload(c, context, case['question']),
+                }
+```
+
+`arm`은 비교할 방식의 이름으로, 여기서는 `full` 또는 `rag`입니다. `key`는 질문 ID, 반복 번호와 방식을 결합한 문자열입니다. 첫 질문의 전체 문맥 요청은 `dev-01:0:full`이 됩니다. 같은 질문도 방식이나 반복 번호가 다르면 별도 요청으로 구분할 수 있습니다.
+
+`(i + repeat) % 2`가 0인지 1인지에 따라 두 방식의 순서를 교대합니다. 무작위로 섞지 않고 같은 조건에서 정해진 순서를 사용하는 방법입니다. `repeats=1`이면 질문마다 먼저 호출할 방식이 바뀝니다.
+
+`plan()`은 이 반복문을 끝까지 실행해 모든 요청을 확인하고, `run()`도 같은 과정을 별도로 수행합니다. 인덱스는 프로젝트 전체에서 딱 한 번 만드는 것이 아니라 **`jobs()`를 한 번 순회할 때마다 한 번** 만듭니다. 계획을 재검증할 때도 검색은 수행하지만 모델 API를 호출하지는 않습니다.
+
+<a id="code-plan"></a>
+### 6. `plan()`과 `verify_plan()`: 실행 조건을 기록하고 대조하기
+
+`plan()`은 `jobs()`가 만든 요청마다 내용의 해시, 입력 추정량과 비용 예약액을 기록합니다. 검색 시간처럼 실행할 때마다 달라지는 측정값은 계획에 넣지 않으므로, 같은 설정과 소스에서 계획을 다시 만들어 비교할 수 있습니다.
+
+```python
+def plan(c, split='dev', limit=2, repeats=1):
+    """전송 전에 모든 요청을 구성하고 건수, 예산과 재현 조건을 저장합니다.
+
+    work에는 로컬에서 만든 요청이 들어가며 HTTP 통신은 수행하지 않습니다.
+    calls에는 요청 본문 대신 해시와 비용 추정치를 남깁니다.
+    files는 실행용 Python과 데이터 파일의 해시입니다.
+    plan_sha256은 마지막에 붙이므로 자기 자신을 포함해 해시하지 않습니다.
+    """
+    validate_config(c)
+    if limit < 0 or repeats < 1:
+        raise ValueError('limit >=0, repeats >=1')
+    work = list(jobs(c, split, limit, repeats))
+    if not work:
+        raise ValueError('Empty dataset')
+    calls = [
+        {
+            'key': j['key'],
+            'request_sha256': sha(j['request']),
+            'input_byte_bound': input_bound(j['request']),
+            'reserved_usd': reserve(j['request'], c),
+        }
+        for j in work
+    ]
+    obj = {
+        'version': 1,
+        'config': c,
+        'split': split,
+        'limit': limit,
+        'repeats': repeats,
+        'calls': calls,
+        'max_calls': len(calls),
+        'reserved_usd': sum(x['reserved_usd'] for x in calls),
+        'files': fingerprints(),
+        'status': 'AWAITING_APPROVAL_NO_LIVE_RESULTS',
+    }
+    obj['plan_sha256'] = sha(obj)
+    return obj
+
+
+def verify_plan(p, approval):
+    """지정한 계획을 현재 코드에서 다시 만든 계획과 대조합니다."""
+    if approval != p['plan_sha256']:
+        raise ValueError('Explicit approval hash required')
+    actual = plan(p['config'], p['split'], p['limit'], p['repeats'])
+    if actual != p:
+        raise ValueError('Plan/data/code changed; regenerate and obtain approval again')
+    if p['reserved_usd'] > p['config']['project_cap_usd']:
+        raise ValueError('Plan exceeds project cap')
+```
+
+`sha()`는 JSON의 키를 정렬하고 불필요한 공백을 제거한 형식으로 변환한 뒤 SHA-256을 계산합니다. 딕셔너리에 값을 넣은 순서만 달라졌을 때 해시가 달라지는 일을 피합니다. `fingerprints()`는 실험 폴더 바로 아래의 Python 파일과 `data/`의 TXT·JSONL을 대상으로 합니다. README와 분석용 하위 폴더까지 모든 파일을 검사하는 것은 아닙니다.
+
+`--approve`에는 검토한 계획의 해시를 지정합니다. 해시를 안다는 사실 자체가 사람의 승인을 증명하지는 않습니다. 실행할 계획을 명시해서 다른 계획을 잘못 실행하는 일을 줄이는 확인 절차입니다. 원래 계획 JSON에 남은 `AWAITING_APPROVAL_NO_LIVE_RESULTS`는 계획을 만든 시점의 상태이며, 이후 실행했는지는 `outputs/`와 원장에서 확인합니다.
+
+입력 예약량은 요청 JSON의 UTF-8 바이트 수에 1,024를 더해 구합니다. 실제 토크나이저로 센 값이나 API가 보장하는 상한은 아닙니다. 입력 예약 단가는 100만 토큰당 0.25달러, 출력은 설정한 최대 1,024토큰으로 계산합니다. 실행 뒤 보고된 사용량이 이 추정 조건을 넘으면 중단하지만, 이미 보낸 요청의 비용을 취소하는 장치는 아닙니다.
+
+<a id="code-budget"></a>
+### 7. `account_gate()`와 `Ledger`: 중단할 조건을 정하기
+
+`account_gate()`는 실행 기한, 확인한 잔액, 모델 이용 가능 여부와 환경 변수를 검사합니다. 계정 확인 시각이 24시간보다 오래됐거나 조직·프로젝트가 설정과 다르면 중단합니다. **이 함수가 잔액 API나 모델 목록을 직접 조회하지는 않습니다.** 별도로 확인한 결과를 `account.json`에 기록하고, 그 값과 유효 기간을 검사합니다.
+
+비용 예약은 `Ledger`가 담당합니다. 다음은 `__enter__()`에서 원장을 연 뒤 호출하는 메서드입니다.
+
+```python
+def reserve(self, plan_hash, key, usd):
+    """요청을 보내기 전에 한 번의 호출에 필요한 예약액을 기록합니다.
+
+    계획 해시와 요청 키의 조합으로 이미 시도한 요청인지 판별합니다.
+    합계가 상한을 넘으면 HTTP 전송 전에 예외를 발생시킵니다.
+    임시 파일을 끝까지 쓴 뒤 교체하므로, 기록 중인 JSON이 원장을
+    덮어쓰지 않습니다. 호출 후 예약액을 돌려주는 처리는 없습니다.
+    """
+    identity = plan_hash + ':' + key
+    if any(x['identity'] == identity for x in self.data['calls']):
+        raise ValueError('Call already attempted; no automatic replay')
+    if self.data['reserved_usd'] + usd > self.cap + 1e-12:
+        raise ValueError('Project budget exhausted')
+    self.data['reserved_usd'] += usd
+    self.data['calls'].append({'identity': identity, 'reserved_usd': usd})
+    temp = self.path.with_suffix('.tmp')
+    with temp.open('w', encoding='utf-8') as f:
+        f.write(dump(self.data))
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(temp, self.path)
+```
+
+`__enter__()`는 `O_CREAT | O_EXCL`로 잠금 파일을 만듭니다. 두 실행이 같은 원장에 동시에 비용을 예약하지 않도록 하기 위해서입니다. 일반적인 종료에서는 `__exit__()`가 잠금 파일을 지웁니다. 강제 종료 등으로 파일이 남았다면 다른 실행이 실제로 동작 중인지와 원장 내용을 확인한 뒤 복구해야 합니다.
+
+예약액을 실제 청구액으로 바꾸지는 않습니다. 성공한 요청도 최대 출력을 가정한 예약이 남기 때문에 실측 비용보다 먼저 로컬 예산이 소진될 수 있습니다. 이번 원장의 예약액이 약 0.10649달러이고 토큰 비용 추정치가 약 0.00977달러인 이유입니다.
+
+이 방법은 과금 여부가 불확실한 요청을 이미 지출했을 가능성이 있는 것으로 취급합니다. 같은 원장을 사용하는 실행만 제어하므로 조직 전체의 지출이나 다른 프로그램의 호출을 제한하지는 않습니다.
+
+<a id="code-response"></a>
+### 8. `complete()`와 `parse_response()`: 통신과 답변 읽기를 나누기
+
+모델에 요청을 보내는 함수는 `complete()`입니다. 다른 처리와 통신을 분리했기 때문에 오프라인 검사에서는 이 함수를 고정 응답으로 대체할 수 있습니다.
+
+```python
+def complete(request):
+    """요청을 한 번 POST하고 응답 JSON과 소요 시간을 반환합니다.
+
+    인증값은 환경 변수에서 읽어 HTTP 헤더에 넣습니다.
+    타이머는 요청 객체를 만든 뒤 시작하고 응답 본문을 JSON으로
+    읽을 때까지 측정합니다. 스트리밍하지 않으므로 첫 토큰이 나타나는
+    대기 시간을 뜻하지 않습니다. 실패해도 다시 전송하지 않습니다.
+    """
+    headers = {
+        'Authorization': 'Bearer ' + os.environ['OPENAI_API_KEY'],
+        'Content-Type': 'application/json',
+        'OpenAI-Organization': os.environ['OPENAI_ORG_ID'],
+        'OpenAI-Project': os.environ['OPENAI_PROJECT_ID'],
+    }
+    req = urllib.request.Request(
+        ENDPOINT, dump(request).encode(), headers=headers, method='POST'
+    )
+    start = time.perf_counter()
+    try:
+        with urllib.request.urlopen(req, timeout=120) as response:
+            data = json.load(response)
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f'HTTP {e.code}; stopped; no retry') from None
+    except (urllib.error.URLError, TimeoutError):
+        raise RuntimeError('Network/timeout; billing uncertain; stopped; no retry') from None
+    return data, time.perf_counter() - start
+
+
+def parse_response(data):
+    """완료된 API 응답에서 출력 텍스트를 꺼내 검증합니다.
+
+    output에는 여러 요소가 들어갈 수 있으므로 message 형식만 고릅니다.
+    그 안의 content에서 output_text를 찾아 연결합니다.
+    Answer로 변환할 수 없는 JSON이나 모순된 값은 예외로 처리합니다.
+    """
+    if data.get('status') != 'completed':
+        raise ValueError('Incomplete/refused response')
+    text = ''.join(
+        c['text']
+        for o in data.get('output', [])
+        if o.get('type') == 'message'
+        for c in o.get('content', [])
+        if c.get('type') == 'output_text'
+    )
+    return Answer.model_validate_json(text), text
+```
+
+120초는 `urlopen()`에 전달하는 소켓 작업의 타임아웃입니다. 호출부터 종료까지를 항상 120초 이내로 제한하는 엄밀한 전체 시간 제한은 아닙니다. HTTP 오류나 타임아웃이 발생하면 실행기는 예외의 종류를 기록합니다. 상세 응답 본문과 인증 헤더를 오류 기록에 복사하지 않습니다.
+
+`parse_response()`가 사용하는 `Answer`는 Pydantic 모델입니다. 문자열과 숫자 등 자료형을 엄격하게 검사하고 예상하지 않은 필드를 금지합니다. 또한 `verdict='value'`이면 `value`가 유한한 숫자여야 하고, 그 외에는 null이어야 한다는 일관성도 검사합니다. Python은 참·거짓 값을 정수처럼 다루는 경우가 있으므로 수치 답변에 bool을 넣는 것도 명시적으로 거부합니다.
+
+여기서 검증하는 것은 답변의 형식입니다. `sources`가 실제 문서에 존재하는지와 답이 맞는지는 다음 채점 단계에서 확인합니다.
+
+<a id="code-run"></a>
+### 9. `run()`: 요청 한 건이 기록으로 남기까지
+
+`run()`은 앞에서 살펴본 함수들을 연결합니다. 시작할 때 `verify_plan()`과 `account_gate()`를 호출하고, `exist_ok=False`로 출력 폴더를 만듭니다. 같은 결과 폴더를 덮어쓰지 않도록 하는 설정입니다. 계획, 실행 시작 시각과 라이브러리 버전은 `manifest.json`에 저장합니다.
+
+반복문은 `jobs()`가 만든 요청을 계획 안의 `calls`와 순서대로 묶습니다. 각 요청은 계정 검사와 비용 예약을 마친 뒤 전송합니다. 다음은 `row`에 질문, 방식, 기준 정답과 제공 문단 ID를 넣은 뒤 수행하는 실제 처리 부분입니다.
+
+```python
+# run()의 문항별 처리에서 발췌했습니다. row, job, case, p 등은 앞에서 준비합니다.
+started = time.perf_counter()
+try:
+    data, latency = complete(job['request'])
+    row.update(
+        raw_response=data,
+        api_latency_s=latency,
+        resolved_model=data.get('model'),
+        response_id=data.get('id'),
+    )
+    row.update(usage_cost(data['usage'], p['config']))
+    if (
+        row['input_tokens'] > planned['input_byte_bound']
+        or row['output_tokens'] > p['config']['max_output_tokens']
+    ):
+        raise ValueError('Usage exceeded reservation assumptions; stop')
+
+    answer, text = parse_response(data)
+    row.update(parsed=answer.model_dump(), text=text)
+    all_ids = set(
+        p['id']
+        for p in chunks((ROOT / 'data/handbook.txt').read_text(encoding='utf-8'))
+    )
+    row.update(
+        check_fields(answer, case, all_ids),
+        **evidence(answer, case, job['provided_ids']),
+    )
+    row['status'] = 'ok'
+except Exception as e:
+    row['error_type'] = type(e).__name__
+
+row['e2e_s'] = time.perf_counter() - started + job['retrieval_s']
+rows.append(row)
+```
+
+응답이 도착하면 답변을 파싱하기 전에 `usage_cost()`로 사용량을 기록합니다. 답변 JSON의 형식이 틀려도 API는 이미 생성을 수행했을 수 있습니다. 이 순서로 처리하면 답변 검증에 실패한 요청의 사용량도 남길 수 있습니다.
+
+`status='ok'`는 통신, 형식 검증과 채점 처리가 정상적으로 끝났다는 뜻입니다. **정답을 맞혔다는 뜻은 아닙니다.** 형식에 맞는 `unknown`을 반환해 오답 처리된 `dev-02`의 RAG도 상태는 `ok`, `structured_match`는 0입니다. 오답이어도 비교는 계속합니다. 통신이나 파싱 등에서 예외가 발생하면 해당 요청을 기록한 뒤 후속 호출을 중단합니다.
+
+`e2e_s`에는 HTTP 요청 준비, 통신, 사용량 처리, 파싱, 채점과 검색 시간이 들어갑니다. 인덱스 생성, 계획 검증, 비용 원장 기록과 결과 파일 저장 시간은 포함하지 않습니다. 프로그램을 시작해서 모든 파일을 저장할 때까지 걸리는 전체 실행 시간과 구분해야 합니다.
+
+### 10. `results.jsonl`과 `summarize()`: 나중에 검증할 수 있는 기록 남기기
+
+요청 한 건의 처리가 끝나면 `row`를 JSON 한 줄로 만들어 `results.jsonl`에 추가하고 `flush()`와 `os.fsync()`로 기록을 반영합니다. 매번 `summary.json`도 갱신하므로 중간에 멈춰도 완료된 결과와 미실행 건수를 확인할 수 있습니다. 자동 재개나 실패한 요청의 자동 재전송은 하지 않습니다.
+
+| 기록 필드 | 확인할 수 있는 내용 |
+|---|---|
+| `id`, `arm`, `repeat` | 어떤 질문, 방식과 반복의 결과인가 |
+| `request`, `provided_ids` | 어떤 설정과 문맥을 모델에 전달했는가 |
+| `parsed`, `text` | 검증한 JSON과 생성된 문자열 |
+| `expected`, `reference_sources` | 무엇을 기준으로 채점했는가 |
+| `structured_match`, `citation_f1` | 정답과 근거 ID의 일치 정도 |
+| `input_tokens`, `output_tokens` | API가 보고한 사용량 |
+| `api_latency_s`, `retrieval_s`, `e2e_s` | 측정 범위를 나눠 기록한 시간 |
+| `status`, `error_type` | 처리가 정상적으로 끝났는지, 어떤 예외로 멈췄는지 |
+
+공개 JSONL의 `raw_response`는 상태, 모델과 usage로 축약했습니다. 요청 문맥, 생성 답변과 평가값은 남겨 두었으며 서비스의 응답 ID 등은 공개 기록에서 제거했습니다.
+
+집계는 `experiment.py`의 `summarize(rows, expected)`가 담당합니다. `scoring.py`에도 같은 이름의 함수가 있지만 이 비교 실험에서는 사용하지 않습니다. 실행기는 `scoring.py`에서 `Answer`와 `check_fields`만 가져옵니다.
+
+`expected`는 계획한 총 요청 수입니다. 두 방식의 요청 수가 같다는 전제 아래 각 방식의 분모를 `expected // 2`로 정합니다. 본 실험은 24/2이므로 12입니다. 도중에 멈춰도 분모를 완료 건수로 줄이지 않고, `attempted`, `success`, `unattempted`와 `usage_coverage`를 함께 기록합니다. 미실행을 포함한 일치율만으로 모델을 비교하지 않도록 실행 완료 여부도 함께 읽어야 합니다.
+
+마지막으로 `id`와 `repeat`가 같은 full/rag를 짝지어 정오와 입력 토큰 차이를 기록합니다. 두 방식의 평균뿐 아니라 어떤 질문에서 차이가 났는지 추적하기 위해서입니다. 사람 검토 항목은 `human_review.csv`, 방식별 집계표는 `comparison.csv`에 저장합니다.
+
 
 <a id="evaluation"></a>
 ## 정답과 근거를 따로 평가하는 이유
@@ -170,6 +612,62 @@ print(inputs["rag"])
 실제로 G03의 출석 조건을 묻는 `dev-06`에서 두 방식은 B02와 C09를 인용했습니다. 기준 목록은 B02, B03, B07입니다. 두 집합에 공통으로 들어 있는 문단은 B02 하나이므로 precision은 1/2, recall은 1/3, F1은 0.4입니다. 그러나 답변은 “G03은 세 회차 모두 출석해야 하므로 두 회차 출석으로는 수료할 수 없다”로 정답과 일치했습니다.
 
 따라서 이 실험은 ID 일치 점수와 의미적 검토를 분리합니다. `human_review.csv`에는 설명이 맞는지, 인용이 주장을 뒷받침하는지 사람이 확인할 칸을 두었습니다. 현재 그 칸은 미검토 상태이며, 자동 점수를 사람 평가처럼 제시하지 않습니다.
+
+### 코드에서 정답과 근거를 계산하는 방법
+
+`check_fields()`는 `scoring.py`, `evidence()`는 `experiment.py`에 있습니다. 둘 다 검증을 통과한 `Answer` 객체와 로컬 기준 정답을 받아 점수를 반환합니다. 모델을 다시 호출하는 평가는 아닙니다.
+
+```python
+def check_fields(answer, case, source_ids):
+    """판단 종류와 수치 정답을 비교하고 인용 ID의 존재 여부를 검사합니다.
+
+    source_ids는 원문 전체의 문단 ID 집합입니다. 인용 ID가 실제 문서에
+    존재하는지 확인할 뿐, RAG 입력에 그 문단이 포함됐는지는 검사하지 않습니다.
+    수치 비교는 오차 허용 없이 수행하므로 금액·분 단위 정답에 적합합니다.
+    """
+    expected = case["expected"]
+    match = answer.verdict == expected["verdict"]
+    if expected["verdict"] == "value":
+        match = match and answer.value == expected["value"]
+    return {
+        "structured_match": int(match),
+        "source_ids_valid": int(
+            bool(answer.sources) and set(answer.sources) <= source_ids
+        ),
+    }
+
+
+def evidence(answer, case, provided):
+    """인용, 기준 근거와 실제 제공 문맥을 서로 다른 집합으로 비교합니다.
+
+    cited는 모델의 인용, gold는 기준 근거, provided는 입력에 넣은 문단입니다.
+    set을 사용해 같은 ID를 반복해서 인용해도 점수가 올라가지 않게 합니다.
+    citations_in_context와 retrieval_gold_recall은 비교하는 집합이 다릅니다.
+    """
+    cited, gold = set(answer.sources), set(case['sources'])
+    hit = len(cited & gold)
+    precision = hit / len(cited) if cited else 0.0
+    recall = hit / len(gold) if gold else None
+    return {
+        'citation_precision': precision,
+        'citation_recall': recall,
+        'citation_f1': (
+            2 * precision * recall / (precision + recall)
+            if recall is not None and precision + recall else 0.0
+        ),
+        'citations_in_context': int(bool(cited) and cited <= set(provided)),
+        'retrieval_gold_recall': (
+            len(gold & set(provided)) / len(gold) if gold else None
+        ),
+    }
+```
+
+`source_ids_valid`와 `citations_in_context`를 따로 두는 이유를 예로 들어 보겠습니다. RAG가 받지 않은 A02를 답변에 적었다면 A02는 원문에 존재하므로 앞의 검사는 통과할 수 있습니다. 하지만 실제 제공 문맥에는 없으므로 뒤의 검사는 통과하지 못합니다. 반대로 제공된 A10만 인용했다면 두 검사는 모두 통과할 수 있어도 기준 근거를 충분히 포함했다는 뜻은 아닙니다.
+
+실제 `dev-02`의 RAG는 기준 근거 `{A02, A10, C03}` 중 A10만 검색하고 인용했습니다. 인용 precision은 1, recall은 1/3, F1은 0.5이며, 검색된 기준 근거 비율도 1/3입니다. 인용 ID가 모두 입력에 있었으므로 `citations_in_context`는 1이지만 답변은 `unknown`이어서 `structured_match`는 0입니다. 서로 다른 지표가 같은 답변의 다른 측면을 보여 줍니다.
+
+기준 근거가 없는 질문이라면 검색 recall을 0으로 단정하지 않고 `None`으로 반환합니다. 현재 가온 질문에는 근거 목록이 있지만, 새 데이터에 이 함수를 적용할 때는 이런 값을 집계에서 어떻게 다룰지도 결정해야 합니다. 또한 현재 수치 정답은 정수 금액과 시간 중심이므로 정확한 값의 일치를 사용합니다. 소수점 근사값이나 문자열 답변이 필요한 데이터에는 그대로 적용할 수 없습니다.
+
 
 <a id="results"></a>
 ## 12문항의 실제 결과
@@ -259,6 +757,70 @@ RAG의 질문별 로컬 검색 시간 중앙값은 약 0.000296초, 즉 0.296밀
 이번 요청은 캐시 쓰기 TTL을 지정하지 않았고, 응답에는 TTL별 쓰기 토큰의 분할이 없었습니다. 따라서 기본 30분을 가정했습니다. 12시간 쓰기의 높은 요율을 적용하면 합계는 약 0.01817달러가 됩니다. 이 값도 함께 기록해 가정에 따른 차이를 확인할 수 있게 했습니다. 응답의 최대 보관 설정만 보고 쓰기 TTL을 확정하지는 않았습니다.
 
 위 금액은 API 사용량과 공개 단가로 계산한 **토큰 비용 추정치**입니다. 청구서나 크레딧 차감액을 확인한 수치는 아닙니다. 최초 실행기의 일반 입력·캐시 읽기 계산값은 원본 요약에 남겨 두었으며, 이 글의 비용 표에는 캐시 쓰기를 반영한 후처리 값을 사용했습니다.
+
+### `priced()`: 사용량에서 비용을 다시 계산하기
+
+실행 중의 `usage_cost()`는 입력·캐시 읽기·출력·추론 토큰을 기록합니다. 이 함수의 `token_cost_estimate_usd`는 캐시 쓰기 할증을 반영하기 전 계산이므로, 최종 비용에는 후처리 함수 `priced()`의 결과를 사용합니다. 원래 사용량을 남겨 두면 응답을 다시 생성하지 않고도 비용 계산을 검토할 수 있습니다.
+
+아래는 `analysis/cache_costs.py`의 `priced()` 전체입니다. 같은 파일에서 `D`는 `decimal.Decimal`, `MILLION`은 `D(1000000)`으로 정의합니다.
+
+```python
+def priced(row, config):
+    """저장된 usage를 요금 종류별로 나눠 한 요청의 비용을 계산합니다.
+
+    입력 합계에서 캐시 읽기와 쓰기를 빼 일반 입력을 구합니다.
+    TTL별 쓰기 내역이 있으면 각각의 단가를 적용합니다. 내역이 없으면
+    기본 30분 가정과 12시간 요율을 적용한 값을 둘 다 반환합니다.
+    결과는 Decimal로 계산하고 JSON 저장을 위해 문자열로 변환합니다.
+    """
+    usage = row['raw_response']['usage']
+    details = usage['input_tokens_details']
+    total, cached = usage['input_tokens'], details['cached_tokens']
+    written = details['cache_write_tokens']
+    regular = total - cached - written
+    assert min(regular, cached, written, usage['output_tokens']) >= 0
+    assert total == row['input_tokens'] and cached == row['cached_input_tokens']
+
+    rate = D(str(config['input_usd_per_million']))
+    base = regular * rate + cached * D(str(config['cached_usd_per_million']))
+    base += usage['output_tokens'] * D(str(config['output_usd_per_million']))
+    split = details.get('cache_write_tokens_details')
+    if split is not None:
+        w30, w12 = split['ttl_30m_tokens'], split['ttl_12h_tokens']
+        assert w30 + w12 == written and min(w30, w12) >= 0
+        low = high = (
+            base + rate * (w30 * D('1.25') + w12 * D('2.5'))
+        ) / MILLION
+        assumption = 'usage_ttl_breakdown'
+    else:
+        assert 'prompt_cache_options' not in row['request']
+        low = (base + written * rate * D('1.25')) / MILLION
+        high = (base + written * rate * D('2.5')) / MILLION
+        assumption = 'default_30m_assumed_no_ttl_breakdown'
+
+    return {
+        'id': row['id'],
+        'arm': row['arm'],
+        'repeat': row['repeat'],
+        'ordinary_input_tokens': regular,
+        'cached_input_tokens': cached,
+        'cache_write_tokens': written,
+        'input_tokens': total,
+        'output_tokens': usage['output_tokens'],
+        'assumption': assumption,
+        'cache_aware_estimate_usd': str(low),
+        'write_12h_sensitivity_usd': str(high),
+    }
+```
+
+처음 두 `assert`는 입력 내역에 음수가 생기지 않았는지와 다른 필드에 저장한 사용량이 일치하는지 확인합니다. `Decimal`에는 `float`를 바로 전달하지 않고 문자열을 거쳐 전달해 요금의 소수를 십진수로 계산합니다.
+
+`base`는 일반 입력, 캐시 읽기와 출력의 비용을 합한 값입니다. 쓰기 비용만 나중에 더하므로 같은 입력 토큰을 중복해서 계산하지 않습니다. 추론 토큰은 API의 출력 토큰에 포함되므로 출력 비용에 다시 더하지 않습니다.
+
+TTL별 내역이 있으면 30분과 12시간 쓰기 토큰 수를 확인해 각각 계산합니다. 이때 `low`와 `high`는 같은 값입니다. 내역이 없으면 요청에서 TTL을 지정하지 않았는지 확인하고 두 가정을 적용합니다. `low`와 `high`는 통계적 신뢰 구간이 아니라 요금 가정을 달리한 계산 결과입니다.
+
+`aggregate()`는 이 결과를 방식별, 실행별로 더합니다. 현재 `main()`은 연결 확인 4회와 본 실험 24회의 저장된 결과를 대상으로 건수와 원장을 검사합니다. 요청 수가 다른 새 실험을 분석할 때는 그 실험에 맞춰 집계 대상과 검증 조건을 바꿔야 합니다.
+
 
 <a id="practice"></a>
 ## 직접 실행하고 확인하기
