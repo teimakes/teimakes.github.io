@@ -1,13 +1,13 @@
 ---
 layout: '../../layouts/Post.astro'
 title: '어텐션 강의 3주차: 인과적 셀프 어텐션과 정보 누출'
-description: '한 주 강의·실습·과제로 배우는 어텐션. 학습 가능한 전체 PyTorch 코드와 실제 측정값, 코드 줄별 해설을 제공합니다.'
+description: '학습 가능한 PyTorch 코드와 실습 결과를 통해 어텐션을 살펴봅니다.'
 date: '2026-11-03'
 tags: ['attention', 'transformer', 'pytorch', 'deep-learning']
 ---
 
-> **대학 수준 어텐션 실습 강의 · 3/5**  
-> 이전의 짧은 계산 예제를 학습 가능한 실습과 이론 강의로 전면 개정했습니다. 강의·실습 3시간과 별도 과제를 기준으로 구성했습니다.
+> **어텐션과 트랜스포머 · 3/5**  
+> 미래 정보를 가리는 원리와 인과적 셀프 어텐션의 학습을 살펴봅니다.
 
 ## 강의 시리즈
 
@@ -32,16 +32,15 @@ Linux/Windows에서 CPU 전용 휠을 원하면 마지막 명령에 `--index-url
 
 ## 이 글의 목차
 
-1. [이번 주의 질문: 병렬로 학습하면서도 미래를 못 보게 할 수 있을까?](#section-1)
-2. [1. 자기회귀 언어 모델의 정보 범위](#section-2)
-3. [2. 지연 복사 과제 명세](#section-3)
-4. [3. 셀프 어텐션과 위치 임베딩](#section-4)
-5. [4. 마스크의 행과 열을 확실히 구분하기](#section-5)
-6. [5. 전체 PyTorch 코드](#section-6)
-7. [6. 코드 줄별 해설](#section-7)
-8. [7. 학습 결과와 인과성 검증](#section-8)
-9. [8. 길이와 평가 범위](#section-9)
-10. [9. 과제: 정보 누출을 직접 찾아내기](#section-10)
+- [이번 주의 질문: 병렬로 학습하면서도 미래를 못 보게 할 수 있을까?](#section-1)
+- [1. 자기회귀 언어 모델의 정보 범위](#section-2)
+- [2. 지연 복사 과제 명세](#section-3)
+- [3. 셀프 어텐션과 위치 임베딩](#section-4)
+- [4. 마스크의 행과 열을 확실히 구분하기](#section-5)
+- [5. 전체 PyTorch 코드](#section-6)
+- [6. 학습 결과와 인과성 검증](#section-8)
+- [7. 길이와 평가 범위](#section-9)
+- [8. 과제: 정보 누출을 직접 찾아내기](#section-10)
 
 <a id="section-1"></a>
 ## 이번 주의 질문: 병렬로 학습하면서도 미래를 못 보게 할 수 있을까?
@@ -132,6 +131,10 @@ from torch.nn import functional as F
 
 
 def make_batch(size, generator, length=8):
+    """임의 기호와 마지막 QUERY로 입력을 만들고 첫 기호를 복사할 정답으로 둡니다.
+
+    입력과 라벨은 (배치, 길이)이며 QUERY 외의 라벨은 -100으로 무시합니다.
+    """
     inputs = torch.randint(8, (size, length), generator=generator)
     inputs[:, -1] = 8  # QUERY marker
     labels = torch.full_like(inputs, -100)
@@ -149,17 +152,29 @@ class CausalCopy(nn.Module):
         self.output = nn.Linear(dim, 8)
 
     def forward(self, ids):
+        """미래 위치를 가리는 셀프 어텐션으로 각 위치의 logits를 계산합니다.
+
+        ids: (B, T), logits: (B, T, 8), weights: (B, T, T).
+        """
         length = ids.size(1)
         x = self.token(ids) + self.position(torch.arange(length, device=ids.device))
+        # 정규화한 입력에서 Q·K·V를 각각 만듭니다.
         q, k, v = self.qkv(self.norm(x)).chunk(3, dim=-1)
+        # 각 query와 key의 내적으로 위치별 유사도를 계산합니다.
         scores = q @ k.transpose(-2, -1) / math.sqrt(q.size(-1))
+        # 대각선 위쪽이 현재 위치에서 볼 수 없는 미래입니다.
         future = torch.ones(length, length, dtype=torch.bool, device=ids.device).triu(1)
+        # 미래 위치를 소프트맥스 전에 가려 해당 가중치를 0으로 만듭니다.
         weights = scores.masked_fill(future, float('-inf')).softmax(-1)
         return self.output(x + weights @ v), weights
 
 
 @torch.no_grad()
 def evaluate(model, batch):
+    """기울기를 기록하지 않고 손실과 정확도를 계산합니다.
+
+    실습별로 선택 위치, 검색 위치 또는 답 위치도 함께 측정합니다.
+    """
     model.eval()
     x, y = batch
     logits, weights = model(x)
@@ -169,6 +184,7 @@ def evaluate(model, batch):
 
 
 def main():
+    """실행 옵션을 읽고 학습, 검증과 결과 저장을 순서대로 수행합니다."""
     parser = argparse.ArgumentParser()
     parser.add_argument('--steps', type=int, default=700)
     parser.add_argument('--seed', type=int, default=43)
@@ -189,10 +205,14 @@ def main():
         model.train()
         x, y = make_batch(128, train_rng, args.length)
         logits, _ = model(x)
+        # 정답과 logits를 비교합니다. 소프트맥스는 손실 함수 내부에서 처리합니다.
         loss = F.cross_entropy(logits.flatten(0, 1), y.flatten())
+        # 이전 배치의 기울기를 비우고 현재 손실을 역전파합니다.
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
+        # 기울기가 지나치게 커질 때 업데이트의 크기를 제한합니다.
         nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        # 계산된 기울기로 학습 가능한 파라미터를 갱신합니다.
         optimizer.step()
         if step % 100 == 0 or step == args.steps:
             metrics = {'step': step, 'train_loss': loss.item(), **evaluate(model, validation)}
@@ -203,6 +223,7 @@ def main():
         x = validation[0][:4].clone()
         reference, weights = model(x)
         changed = x.clone()
+        # 미래 토큰만 바꾸어 앞쪽 출력이 유지되는지 검사합니다.
         changed[:, -2:] = (changed[:, -2:] + 1) % 9
         perturbed, _ = model(changed)
         assert torch.allclose(reference[:, :-2], perturbed[:, :-2], atol=1e-5)
@@ -225,100 +246,10 @@ if __name__ == '__main__':
     main()
 ```
 
-<a id="section-7"></a>
-## 6. 코드 줄별 해설
-
-- **L1** `"""Week 3: train causal self-attention for delayed copy."""` — 이 실행 파일이 다루는 주제를 설명하는 모듈 문서 문자열입니다.
-- **L2** `import argparse` — 명령행 옵션을 읽을 표준 라이브러리입니다.
-- **L3** `import json` — 학습 기록을 사람이 다시 읽을 수 있는 JSON으로 저장합니다.
-- **L4** `import math` — 어텐션 점수의 제곱근 스케일링에 사용합니다.
-- **L5** `import time` — 학습 구간의 경과 시간을 측정합니다.
-- **L6** `from pathlib import Path` — 출력 폴더와 저장 파일 경로를 다룹니다.
-- **L7** `import torch` — 텐서 연산과 자동 미분을 제공하는 PyTorch를 불러옵니다.
-- **L8** `from torch import nn` — 학습 가능한 계층과 Module을 nn이라는 이름으로 사용합니다.
-- **L9** `from torch.nn import functional as F` — 손실 함수와 one-hot 등 상태 없는 텐서 연산을 F라는 이름으로 사용합니다.
-- **L12** `def make_batch(size, generator, length=8):` — 표본을 생성하는 함수입니다. generator를 외부에서 받아 학습·검증 난수 흐름을 분리합니다.
-- **L13** `inputs = torch.randint(8, (size, length), generator=generator)` — 지정 범위의 정수 기호·값·선택 위치 또는 학습 행 인덱스를 무작위로 뽑습니다.
-- **L14** `inputs[:, -1] = 8  # QUERY marker` — 마지막 입력을 QUERY라는 전용 기호 ID로 바꿉니다.
-- **L15** `labels = torch.full_like(inputs, -100)` — 모든 출력 위치를 무시 인덱스로 초기화한 뒤 실제 감독할 위치만 정답으로 바꿀 준비를 합니다.
-- **L16** `labels[:, -1] = inputs[:, 0]  # answer after QUERY copies first symbol` — QUERY 위치의 다음 토큰 정답을 첫 입력 기호로 설정합니다. 다른 위치의 출력 손실은 무시됩니다.
-- **L17** `return inputs, labels` — 모델 입력과 정답, 분석용 정답 위치를 반환합니다. 위치 정보는 해당 실습의 학습 손실에 직접 넣지 않습니다.
-- **L20** `class CausalCopy(nn.Module):` — `CausalCopy` 모듈을 정의합니다. 계층의 파라미터 등록과 학습·평가 상태 관리를 PyTorch에 맡깁니다.
-- **L21** `def __init__(self, context=12, dim=32):` — 학습 가능한 하위 계층을 등록합니다. nn.Module의 속성으로 저장해야 parameters와 state_dict에 포함됩니다.
-- **L22** `super().__init__()` — 부모 nn.Module을 초기화해 하위 계층과 파라미터 등록을 사용할 준비를 합니다.
-- **L23** `self.token = nn.Embedding(9, dim)` — 범주 ID를 학습 가능한 밀집 벡터로 바꾸는 조회표를 등록합니다. 위치 임베딩도 같은 원리로 학습됩니다.
-- **L24** `self.position = nn.Embedding(context, dim)` — 범주 ID를 학습 가능한 밀집 벡터로 바꾸는 조회표를 등록합니다. 위치 임베딩도 같은 원리로 학습됩니다.
-- **L25** `self.norm = nn.LayerNorm(dim)` — 각 토큰의 특성 축을 정규화하는 학습 가능한 LayerNorm 계층을 등록합니다.
-- **L26** `self.qkv = nn.Linear(dim, 3 * dim)` — 지정한 입력·출력 차원의 학습 가능한 선형 변환을 등록합니다. bias=False인 계층에는 편향을 두지 않습니다.
-- **L27** `self.output = nn.Linear(dim, 8)` — 지정한 입력·출력 차원의 학습 가능한 선형 변환을 등록합니다. bias=False인 계층에는 편향을 두지 않습니다.
-- **L29** `def forward(self, ids):` — 입력 텐서로부터 출력까지의 순전파를 정의합니다. 학습 시 자동 미분 그래프가 이 연산을 기록합니다.
-- **L30** `length = ids.size(1)` — 현재 입력의 배치·길이·특성 차원을 읽거나 위치 인덱스를 생성합니다.
-- **L31** `x = self.token(ids) + self.position(torch.arange(length, device=ids.device))` — 배치 행 또는 시퀀스 위치의 인덱스를 만들어 같은 표본 안에서 올바른 값을 선택합니다.
-- **L32** `q, k, v = self.qkv(self.norm(x)).chunk(3, dim=-1)` — 입력 표현을 Q·K·V로 투영하고 필요하면 헤드 축으로 나눕니다. 셀프 어텐션은 같은 입력, 교차 어텐션은 서로 다른 입력을 사용합니다.
-- **L33** `scores = q @ k.transpose(-2, -1) / math.sqrt(q.size(-1))` — query와 key의 내적을 계산합니다. 스케일링이 같은 줄에 있으면 헤드 차원의 제곱근으로 나눕니다.
-- **L34** `future = torch.ones(length, length, dtype=torch.bool, device=ids.device).triu(1)` — 대각선을 제외한 위쪽 삼각형을 True로 만들어 현재 query보다 뒤쪽 key를 표시합니다.
-- **L35** `weights = scores.masked_fill(future, float('-inf')).softmax(-1)` — 미래 위치 점수를 음의 무한대로 바꾼 다음 key 축 소프트맥스로 정규화합니다.
-- **L36** `return self.output(x + weights @ v), weights` — 예측 logits와 어텐션 가중치를 함께 반환해 성능과 내부 선택을 따로 분석합니다.
-- **L40** `def evaluate(model, batch):` — 검증 지표를 계산합니다. no_grad와 eval을 함께 사용해 평가와 학습을 구분합니다.
-- **L41** `model.eval()` — 모델을 평가 모드로 설정합니다. 이 호출만으로 자동 미분이 꺼지지는 않습니다.
-- **L42** `x, y = batch` — 준비된 표본 묶음을 입력·정답·분석용 선택 위치로 풀어 각 계산에 전달합니다.
-- **L43** `logits, weights = model(x)` — 모델의 순전파 결과에서 점수 또는 가중치를 받아 예측과 내부 선택을 분석합니다.
-- **L44–46** `return {'loss': F.cross_entropy(logits.flatten(0, 1), y.flatten()).item(),` — 손실과 정확도 등 평가 지표를 Python 숫자 사전으로 반환합니다. item은 텐서의 스칼라를 꺼냅니다.
-- **L49** `def main():` — 옵션 파싱부터 데이터 준비, 학습, 평가와 저장까지 실행 순서를 연결합니다.
-- **L50** `parser = argparse.ArgumentParser()` — 명령행 실행 설정을 구성하거나 실제 입력 옵션을 해석합니다.
-- **L51** `parser.add_argument('--steps', type=int, default=700)` — 실행 옵션의 이름·자료형·기본값을 등록합니다. --out을 바꾸면 이전 실험 기록을 보존할 수 있습니다.
-- **L52** `parser.add_argument('--seed', type=int, default=43)` — 실행 옵션의 이름·자료형·기본값을 등록합니다. --out을 바꾸면 이전 실험 기록을 보존할 수 있습니다.
-- **L53** `parser.add_argument('--length', type=int, default=8)` — 실행 옵션의 이름·자료형·기본값을 등록합니다. --out을 바꾸면 이전 실험 기록을 보존할 수 있습니다.
-- **L54** `parser.add_argument('--out', default='runs/week03')` — 실행 옵션의 이름·자료형·기본값을 등록합니다. --out을 바꾸면 이전 실험 기록을 보존할 수 있습니다.
-- **L55** `args = parser.parse_args()` — 명령행 실행 설정을 구성하거나 실제 입력 옵션을 해석합니다.
-- **L56** `if not 2 <= args.length <= 12:` — 입력 길이·헤드 차원·온도 등의 전제 조건을 검사해 잘못된 실행을 차단합니다.
-- **L57** `parser.error('length must be between 2 and 12')` — 지원하지 않는 길이 설정을 사용자에게 알리고 실행을 종료합니다.
-- **L58** `torch.set_num_threads(1)` — 작은 CPU 실습의 스레드 과잉 비용을 줄이고 실행 환경을 단순화합니다.
-- **L59** `torch.manual_seed(args.seed)` — 모델 초기화와 기본 난수의 시드를 설정합니다. 버전·장치가 달라지면 완전한 수치 일치까지 보장하지는 않습니다.
-- **L60** `train_rng = torch.Generator().manual_seed(args.seed + 1)` — 독립적인 난수 생성기를 만들고 시드를 고정해 학습과 평가 데이터 흐름을 통제합니다.
-- **L61** `validation = make_batch(2048, torch.Generator().manual_seed(args.seed + 1000), args.length)` — 고정 평가 표본 또는 이번 step의 학습 표본을 준비합니다. 학습·검증·테스트의 역할을 구분하세요.
-- **L62** `model = CausalCopy()` — 지정한 구성으로 학습 가능한 모델을 만듭니다. 저장 상태를 읽기 전에는 초기 파라미터입니다.
-- **L63** `optimizer = torch.optim.AdamW(model.parameters(), lr=0.003)` — 등록된 학습 파라미터를 AdamW로 최적화하도록 설정합니다. 학습률과 감쇠값은 코드에 명시합니다.
-- **L64** `history = [{'step': 0, **evaluate(model, validation)}]` — 업데이트 전의 검증 지표부터 기록해 학습 효과를 초기 상태와 비교할 수 있게 합니다.
-- **L65** `started = time.perf_counter()` — 학습 및 최종 진단 구간의 경과 시간 측정을 시작합니다.
-- **L66** `for step in range(1, args.steps + 1):` — 새 학습 배치를 사용해 지정한 횟수만큼 파라미터 업데이트를 반복합니다.
-- **L67** `model.train()` — 모델을 학습 모드로 되돌립니다. 검증 직후에도 이 호출이 필요합니다.
-- **L68** `x, y = make_batch(128, train_rng, args.length)` — 고정 평가 표본 또는 이번 step의 학습 표본을 준비합니다. 학습·검증·테스트의 역할을 구분하세요.
-- **L69** `logits, _ = model(x)` — 모델의 순전파 결과에서 점수 또는 가중치를 받아 예측과 내부 선택을 분석합니다.
-- **L70** `loss = F.cross_entropy(logits.flatten(0, 1), y.flatten())` — 소프트맥스 전 logits와 정수 정답으로 평균 교차 엔트로피를 계산합니다. -100 라벨은 기본적으로 무시됩니다.
-- **L71** `optimizer.zero_grad(set_to_none=True)` — 이전 step의 기울기를 비워 의도하지 않은 누적을 방지합니다.
-- **L72** `loss.backward()` — 손실에서 점수·투영·임베딩까지 연쇄 법칙으로 기울기를 계산합니다.
-- **L73** `nn.utils.clip_grad_norm_(model.parameters(), 1.0)` — 전체 파라미터 기울기의 노름을 제한해 큰 업데이트를 완화합니다.
-- **L74** `optimizer.step()` — 계산된 기울기와 AdamW의 상태를 사용해 파라미터를 갱신합니다.
-- **L75** `if step % 100 == 0 or step == args.steps:` — 정해진 간격과 마지막 단계에서 검증·로그를 실행합니다. 학습 step과 epoch는 다릅니다.
-- **L76** `metrics = {'step': step, 'train_loss': loss.item(), **evaluate(model, validation)}` — 학습 단계와 손실, 고정 검증 데이터의 지표를 묶습니다. 검증 후 다음 step에서 학습 모드로 복귀합니다.
-- **L77** `history.append(metrics)` — 이번 검증 지표를 순서대로 기록해 학습 곡선과 초기·최종 비교에 사용합니다.
-- **L78** `print(json.dumps(metrics))` — 현재 실행의 지표나 진단 결과를 터미널에 출력합니다. JSON 로그는 후처리하기 쉽습니다.
-- **L79** `model.eval()` — 모델을 평가 모드로 설정합니다. 이 호출만으로 자동 미분이 꺼지지는 않습니다.
-- **L80** `with torch.no_grad():` — 이 블록에서는 기울기 기록을 꺼서 검증과 구조 검사에 필요한 계산만 수행합니다.
-- **L81** `x = validation[0][:4].clone()` — 고정 검증 입력의 일부를 복사해 원본 데이터에 영향을 주지 않고 구조 검사를 수행합니다.
-- **L82** `reference, weights = model(x)` — 모델의 순전파 결과에서 점수 또는 가중치를 받아 예측과 내부 선택을 분석합니다.
-- **L83** `changed = x.clone()` — 미래 입력만 바꾼 복사본을 만들어 과거 출력의 불변성을 검사합니다.
-- **L84** `changed[:, -2:] = (changed[:, -2:] + 1) % 9` — 미래 입력만 바꾼 복사본을 만들어 과거 출력의 불변성을 검사합니다.
-- **L85** `perturbed, _ = model(changed)` — 모델의 순전파 결과에서 점수 또는 가중치를 받아 예측과 내부 선택을 분석합니다.
-- **L86** `assert torch.allclose(reference[:, :-2], perturbed[:, :-2], atol=1e-5)` — 미래 입력만 변경했을 때 앞쪽 출력이 변하지 않는지 수치 오차 허용 범위에서 검사합니다.
-- **L87** `assert torch.count_nonzero(weights.triu(1)) == 0` — 금지된 미래 위치의 어텐션 가중치가 정확히 0인지 검사합니다.
-- **L88** `fixed = model(x[:1])[0]` — 모델의 순전파 결과에서 점수 또는 가중치를 받아 예측과 내부 선택을 분석합니다.
-- **L89** `longer_batch = model(x)[0][:1]` — 모델의 순전파 결과에서 점수 또는 가중치를 받아 예측과 내부 선택을 분석합니다.
-- **L90** `assert torch.allclose(fixed, longer_batch, atol=1e-5)` — 표본을 단독 계산하거나 배치로 계산해도 결과가 같은지 검사합니다.
-- **L91–94** `report = {'torch': torch.__version__, 'seed': args.seed, 'length': args.length,` — 환경·실험 설정·학습 이력·진단 또는 테스트 결과를 하나의 재현 가능한 기록으로 묶습니다.
-- **L95** `output = Path(args.out)` — 사용자가 지정한 결과 저장 경로를 Path 객체로 만듭니다.
-- **L96** `output.mkdir(parents=True, exist_ok=True)` — 기록과 체크포인트를 저장할 출력 폴더를 만듭니다.
-- **L97** `(output / 'metrics.json').write_text(json.dumps(report, indent=2))` — 실행 설정과 측정 기록을 JSON 파일로 저장합니다. 글의 그래프는 이 숫자에서 생성됩니다.
-- **L98** `torch.save(model.state_dict(), output / 'model.pt')` — 모델의 학습된 상태를 파일에 저장합니다. 5주차에서는 어휘와 선택 step도 함께 보관합니다.
-- **L99** `print('causality and batch independence: passed')` — 현재 실행의 지표나 진단 결과를 터미널에 출력합니다. JSON 로그는 후처리하기 쉽습니다.
-- **L102** `if __name__ == '__main__':` — 파일을 직접 실행할 때 main을 호출하고, 다른 코드에서 import할 때는 학습을 시작하지 않도록 합니다.
-- **L103** `main()` — 명령행에서 지정한 설정으로 전체 학습 실험을 실행합니다.
-
 <a id="section-8"></a>
-## 7. 학습 결과와 인과성 검증
+## 6. 학습 결과와 인과성 검증
 
-측정 환경은 Python 3.12.14, PyTorch 2.15.0+cpu, CPU, 스레드 1개입니다. 기본 시드는 43이고 마지막 기록은 700 step입니다. 아래 숫자와 그래프는 실제 실행에서 저장한 값입니다. 시간은 기기와 병렬 작업에 따라 달라지는 참고값입니다.
+측정 환경은 Python 3.12.14, PyTorch 2.15.0+cpu, CPU, 스레드 1개입니다. 기본 시드는 43이고 마지막 기록은 700 step입니다.
 
 | 지표 | 학습 전 | 마지막 step |
 |---|---:|---:|
@@ -347,14 +278,14 @@ if __name__ == '__main__':
 인과성이 올바르다는 것과 정답을 잘 맞힌다는 것은 독립된 조건입니다. 완전히 틀린 예측도 미래 정보 없이 만들 수 있고, 누출된 모델은 부당하게 높은 정확도를 얻을 수 있습니다. 따라서 구조적 검사와 검증 성능을 함께 확인해야 합니다.
 
 <a id="section-9"></a>
-## 8. 길이와 평가 범위
+## 7. 길이와 평가 범위
 
 `--length 12`는 길이 12의 입력으로 **다시 학습하는** 옵션입니다. 길이 8로 학습한 모델을 그대로 12에 평가하는 길이 외삽 실험과 구분해야 합니다. 학습하지 않은 위치 임베딩은 단순히 표가 존재한다고 유효한 표현이 되는 것이 아닙니다.
 
 길이가 늘어나면 점수 행렬의 위치 쌍이 늘어납니다. 현재처럼 모든 쌍을 명시적으로 계산하는 구현은 각 배치에서 대략 T²개의 점수를 만듭니다. 작은 실습에서는 미미하지만 실제 장문에서는 메모리와 시간이 중요해집니다.
 
 <a id="section-10"></a>
-## 9. 과제: 정보 누출을 직접 찾아내기
+## 8. 과제: 정보 누출을 직접 찾아내기
 
 1. `triu(1)`을 다른 방향으로 바꾸고 미래 변경 검사가 실패하는지 확인하세요. 정확도만 보고 버그를 찾을 수 있는지도 논의합니다.
 2. 위치 임베딩을 0으로 두고 모델을 다시 학습하세요. QUERY가 첫 위치를 구분할 정보가 어떤 경로에 남아 있는지 분석합니다. 인과 마스크 자체가 구조적 정보를 줄 가능성도 고려해야 합니다.
@@ -369,4 +300,3 @@ if __name__ == '__main__':
 - [PyTorch SDPA 공식 문서](https://docs.pytorch.org/docs/2.15/generated/torch.nn.functional.scaled_dot_product_attention.html): 마스크와 스케일링의 구현 의미를 확인합니다.
 - [PyTorch CrossEntropyLoss 공식 문서](https://docs.pytorch.org/docs/2.15/generated/torch.nn.CrossEntropyLoss.html): logits, 정수 타깃과 무시 인덱스를 확인합니다.
 
-이 글의 합성 데이터·실습 코드는 강의를 위해 새롭게 작성했습니다.

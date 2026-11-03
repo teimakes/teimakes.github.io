@@ -1,13 +1,13 @@
 ---
 layout: '../../layouts/Post.astro'
 title: '어텐션 강의 4주차: 멀티헤드 학습과 통제된 비교 실험'
-description: '한 주 강의·실습·과제로 배우는 어텐션. 학습 가능한 전체 PyTorch 코드와 실제 측정값, 코드 줄별 해설을 제공합니다.'
+description: '학습 가능한 PyTorch 코드와 실습 결과를 통해 어텐션을 살펴봅니다.'
 date: '2026-11-03'
 tags: ['attention', 'transformer', 'pytorch', 'deep-learning']
 ---
 
-> **대학 수준 어텐션 실습 강의 · 4/5**  
-> 이전의 짧은 계산 예제를 학습 가능한 실습과 이론 강의로 전면 개정했습니다. 강의·실습 3시간과 별도 과제를 기준으로 구성했습니다.
+> **어텐션과 트랜스포머 · 4/5**  
+> 멀티헤드 어텐션을 구현하고 헤드 수에 따른 학습 결과를 비교합니다.
 
 ## 강의 시리즈
 
@@ -32,17 +32,16 @@ Linux/Windows에서 CPU 전용 휠을 원하면 마지막 명령에 `--index-url
 
 ## 이 글의 목차
 
-1. [이번 주의 질문: 두 가지 관계를 동시에 읽으려면?](#section-1)
-2. [1. 이번 데이터는 왜 더 어려운가?](#section-2)
-3. [2. 한 헤드가 평균을 만들 때 생기는 문제](#section-3)
-4. [3. 투영 행렬 하나와 헤드별 행렬의 관계](#section-4)
-5. [4. 축 변환을 종이에 적어 보기](#section-5)
-6. [5. 두 답의 손실과 평가](#section-6)
-7. [6. 전체 PyTorch 코드](#section-7)
-8. [7. 코드 줄별 해설](#section-8)
-9. [8. 학습과 헤드 수 비교 결과](#section-9)
-10. [9. 절제 실험을 설계하기](#section-10)
-11. [10. 과제와 토론](#section-11)
+- [이번 주의 질문: 두 가지 관계를 동시에 읽으려면?](#section-1)
+- [1. 이번 데이터는 왜 더 어려운가?](#section-2)
+- [2. 한 헤드가 평균을 만들 때 생기는 문제](#section-3)
+- [3. 투영 행렬 하나와 헤드별 행렬의 관계](#section-4)
+- [4. 축 변환을 종이에 적어 보기](#section-5)
+- [5. 두 답의 손실과 평가](#section-6)
+- [6. 전체 PyTorch 코드](#section-7)
+- [7. 학습과 헤드 수 비교 결과](#section-9)
+- [8. 절제 실험을 설계하기](#section-10)
+- [9. 과제와 토론](#section-11)
 
 <a id="section-1"></a>
 ## 이번 주의 질문: 두 가지 관계를 동시에 읽으려면?
@@ -126,6 +125,10 @@ from torch.nn import functional as F
 
 
 def make_batch(size, generator):
+    """두 카드 이름과 두 속성을 질의하는 검색 문제를 생성합니다.
+
+    카드 값은 (배치, 카드 수, 2), 질문과 정답은 각각 (배치, 2)입니다.
+    """
     keys = torch.rand(size, 12, generator=generator).argsort(-1)[:, :5]
     values = torch.randint(4, (size, 5, 2), generator=generator)
     chosen = torch.randint(5, (size, 2), generator=generator)
@@ -152,10 +155,18 @@ class MultiRetriever(nn.Module):
         self.classifier = nn.Linear(dim, 8)
 
     def split(self, x):
+        """마지막 표현 차원을 헤드별로 나눕니다.
+
+        (B, T, D)를 (B, H, T, D/H)로 변환합니다.
+        """
         batch, length, _ = x.shape
         return x.reshape(batch, length, self.heads, self.dh).transpose(1, 2)
 
     def forward(self, keys, values, query, uniform=False):
+        """두 질문을 헤드별로 처리해 색과 모양의 logits를 반환합니다.
+
+        logits: (B, 2, 4), weights: (B, H, 1, 카드 수).
+        """
         batch = keys.size(0)
         q_input = self.key(query).reshape(batch, 1, 2 * self.dim)
         value_input = torch.cat([self.color(values[..., 0]),
@@ -163,18 +174,26 @@ class MultiRetriever(nn.Module):
         q = self.split(self.wq(q_input))
         k = self.split(self.wk(self.key(keys)))
         v = self.split(self.wv(value_input))
+        # 각 query와 key의 내적으로 위치별 유사도를 계산합니다.
         scores = q @ k.transpose(-2, -1) / math.sqrt(self.dh)
+        # 위치별 점수를 확률로 바꾸어 어느 입력을 참고할지 정합니다.
         weights = scores.softmax(-1)
         if uniform:
             weights = torch.ones_like(weights) / keys.size(1)
         contexts = weights @ v
+        # 헤드별 문맥을 위치별로 다시 이어 붙입니다.
         merged = contexts.transpose(1, 2).contiguous().reshape(batch, self.dim)
+        # 두 질문의 정답을 각각 네 개의 클래스 중에서 예측합니다.
         logits = self.classifier(self.wo(merged)).reshape(batch, 2, 4)
         return logits, weights
 
 
 @torch.no_grad()
 def evaluate(model, batch, uniform=False):
+    """기울기를 기록하지 않고 손실과 정확도를 계산합니다.
+
+    실습별로 선택 위치, 검색 위치 또는 답 위치도 함께 측정합니다.
+    """
     model.eval()
     keys, values, query, target, _ = batch
     logits, _ = model(keys, values, query, uniform)
@@ -185,6 +204,7 @@ def evaluate(model, batch, uniform=False):
 
 
 def main():
+    """실행 옵션을 읽고 학습, 검증과 결과 저장을 순서대로 수행합니다."""
     parser = argparse.ArgumentParser()
     parser.add_argument('--steps', type=int, default=1200)
     parser.add_argument('--seed', type=int, default=44)
@@ -203,10 +223,14 @@ def main():
         model.train()
         keys, values, query, target, _ = make_batch(128, train_rng)
         logits, _ = model(keys, values, query)
+        # 정답과 logits를 비교합니다. 소프트맥스는 손실 함수 내부에서 처리합니다.
         loss = F.cross_entropy(logits.reshape(-1, 4), target.flatten())
+        # 이전 배치의 기울기를 비우고 현재 손실을 역전파합니다.
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
+        # 기울기가 지나치게 커질 때 업데이트의 크기를 제한합니다.
         nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        # 계산된 기울기로 학습 가능한 파라미터를 갱신합니다.
         optimizer.step()
         if step % 200 == 0 or step == args.steps:
             metrics = {'step': step, 'train_loss': loss.item(), **evaluate(model, validation)}
@@ -234,111 +258,10 @@ if __name__ == '__main__':
     main()
 ```
 
-<a id="section-8"></a>
-## 7. 코드 줄별 해설
-
-- **L1** `"""Week 4: multi-head cross-attention for two independent lookups."""` — 이 실행 파일이 다루는 주제를 설명하는 모듈 문서 문자열입니다.
-- **L2** `import argparse` — 명령행 옵션을 읽을 표준 라이브러리입니다.
-- **L3** `import json` — 학습 기록을 사람이 다시 읽을 수 있는 JSON으로 저장합니다.
-- **L4** `import math` — 어텐션 점수의 제곱근 스케일링에 사용합니다.
-- **L5** `import time` — 학습 구간의 경과 시간을 측정합니다.
-- **L6** `from pathlib import Path` — 출력 폴더와 저장 파일 경로를 다룹니다.
-- **L7** `import torch` — 텐서 연산과 자동 미분을 제공하는 PyTorch를 불러옵니다.
-- **L8** `from torch import nn` — 학습 가능한 계층과 Module을 nn이라는 이름으로 사용합니다.
-- **L9** `from torch.nn import functional as F` — 손실 함수와 one-hot 등 상태 없는 텐서 연산을 F라는 이름으로 사용합니다.
-- **L12** `def make_batch(size, generator):` — 표본을 생성하는 함수입니다. generator를 외부에서 받아 학습·검증 난수 흐름을 분리합니다.
-- **L13** `keys = torch.rand(size, 12, generator=generator).argsort(-1)[:, :5]` — 이름별 무작위 점수를 정렬하고 일부를 골라 표본 내 이름 중복을 피합니다.
-- **L14** `values = torch.randint(4, (size, 5, 2), generator=generator)` — 지정 범위의 정수 기호·값·선택 위치 또는 학습 행 인덱스를 무작위로 뽑습니다.
-- **L15** `chosen = torch.randint(5, (size, 2), generator=generator)` — 지정 범위의 정수 기호·값·선택 위치 또는 학습 행 인덱스를 무작위로 뽑습니다.
-- **L16** `rows = torch.arange(size)` — 배치 행 또는 시퀀스 위치의 인덱스를 만들어 같은 표본 안에서 올바른 값을 선택합니다.
-- **L17** `query = keys.gather(1, chosen)` — 각 표본에서 선택된 카드 위치의 이름을 모아 질문 ID를 만듭니다.
-- **L18–19** `target = torch.stack([values[rows, chosen[:, 0], 0],` — 여러 특성 또는 두 정답을 지정한 축으로 쌓아 단일 텐서로 만듭니다.
-- **L20** `return keys, values, query, target, chosen` — 모델 입력과 정답, 분석용 정답 위치를 반환합니다. 위치 정보는 해당 실습의 학습 손실에 직접 넣지 않습니다.
-- **L23** `class MultiRetriever(nn.Module):` — `MultiRetriever` 모듈을 정의합니다. 계층의 파라미터 등록과 학습·평가 상태 관리를 PyTorch에 맡깁니다.
-- **L24** `def __init__(self, heads=2, dim=32):` — 학습 가능한 하위 계층을 등록합니다. nn.Module의 속성으로 저장해야 parameters와 state_dict에 포함됩니다.
-- **L25** `super().__init__()` — 부모 nn.Module을 초기화해 하위 계층과 파라미터 등록을 사용할 준비를 합니다.
-- **L26** `if dim % heads:` — 입력 길이·헤드 차원·온도 등의 전제 조건을 검사해 잘못된 실행을 차단합니다.
-- **L27** `raise ValueError('dim must be divisible by heads')` — 지원하지 않는 설정을 설명하는 예외를 발생시킵니다.
-- **L28** `self.heads, self.dim, self.dh = heads, dim, dim // heads` — 헤드 수·전체 차원·헤드당 차원 또는 최대 문맥 길이를 모듈의 구성으로 저장합니다.
-- **L29** `self.key = nn.Embedding(12, dim)` — 범주 ID를 학습 가능한 밀집 벡터로 바꾸는 조회표를 등록합니다. 위치 임베딩도 같은 원리로 학습됩니다.
-- **L30** `self.color = nn.Embedding(4, dim)` — 범주 ID를 학습 가능한 밀집 벡터로 바꾸는 조회표를 등록합니다. 위치 임베딩도 같은 원리로 학습됩니다.
-- **L31** `self.shape = nn.Embedding(4, dim)` — 범주 ID를 학습 가능한 밀집 벡터로 바꾸는 조회표를 등록합니다. 위치 임베딩도 같은 원리로 학습됩니다.
-- **L32** `self.wq = nn.Linear(2 * dim, dim, bias=False)` — 지정한 입력·출력 차원의 학습 가능한 선형 변환을 등록합니다. bias=False인 계층에는 편향을 두지 않습니다.
-- **L33** `self.wk = nn.Linear(dim, dim, bias=False)` — 지정한 입력·출력 차원의 학습 가능한 선형 변환을 등록합니다. bias=False인 계층에는 편향을 두지 않습니다.
-- **L34** `self.wv = nn.Linear(2 * dim, dim, bias=False)` — 지정한 입력·출력 차원의 학습 가능한 선형 변환을 등록합니다. bias=False인 계층에는 편향을 두지 않습니다.
-- **L35** `self.wo = nn.Linear(dim, dim)` — 지정한 입력·출력 차원의 학습 가능한 선형 변환을 등록합니다. bias=False인 계층에는 편향을 두지 않습니다.
-- **L36** `self.classifier = nn.Linear(dim, 8)` — 지정한 입력·출력 차원의 학습 가능한 선형 변환을 등록합니다. bias=False인 계층에는 편향을 두지 않습니다.
-- **L38** `def split(self, x):` — 투영된 마지막 차원을 여러 헤드로 나누고 축을 B,H,T,Dh 순으로 배치합니다.
-- **L39** `batch, length, _ = x.shape` — 현재 입력의 배치·길이·특성 차원을 읽거나 위치 인덱스를 생성합니다.
-- **L40** `return x.reshape(batch, length, self.heads, self.dh).transpose(1, 2)` — 헤드별로 재배치한 텐서를 반환합니다. 첫 축의 표본을 서로 섞지 않도록 축 순서를 유지합니다.
-- **L42** `def forward(self, keys, values, query, uniform=False):` — 입력 텐서로부터 출력까지의 순전파를 정의합니다. 학습 시 자동 미분 그래프가 이 연산을 기록합니다.
-- **L43** `batch = keys.size(0)` — 현재 입력의 배치·길이·특성 차원을 읽거나 위치 인덱스를 생성합니다.
-- **L44** `q_input = self.key(query).reshape(batch, 1, 2 * self.dim)` — 두 질문 또는 두 속성의 임베딩을 마지막 특성 축으로 이어 붙여 순서를 보존합니다.
-- **L45–46** `value_input = torch.cat([self.color(values[..., 0]),` — 두 질문 또는 두 속성의 임베딩을 마지막 특성 축으로 이어 붙여 순서를 보존합니다.
-- **L47** `q = self.split(self.wq(q_input))` — 입력 표현을 Q·K·V로 투영하고 필요하면 헤드 축으로 나눕니다. 셀프 어텐션은 같은 입력, 교차 어텐션은 서로 다른 입력을 사용합니다.
-- **L48** `k = self.split(self.wk(self.key(keys)))` — 입력 표현을 Q·K·V로 투영하고 필요하면 헤드 축으로 나눕니다. 셀프 어텐션은 같은 입력, 교차 어텐션은 서로 다른 입력을 사용합니다.
-- **L49** `v = self.split(self.wv(value_input))` — 입력 표현을 Q·K·V로 투영하고 필요하면 헤드 축으로 나눕니다. 셀프 어텐션은 같은 입력, 교차 어텐션은 서로 다른 입력을 사용합니다.
-- **L50** `scores = q @ k.transpose(-2, -1) / math.sqrt(self.dh)` — query와 key의 내적을 계산합니다. 스케일링이 같은 줄에 있으면 헤드 차원의 제곱근으로 나눕니다.
-- **L51** `weights = scores.softmax(-1)` — 각 query가 참고할 key 위치의 가중치를 합이 1이 되도록 계산합니다.
-- **L52** `if uniform:` — 학습된 선택 가중치 대신 균등 가중치로 바꾸는 평가 개입입니다. 재학습 기준선과 구분합니다.
-- **L53** `weights = torch.ones_like(weights) / keys.size(1)` — 모든 key 위치에 동일한 비율을 부여해 학습된 선택을 제거하는 개입을 만듭니다.
-- **L54** `contexts = weights @ v` — 가중치로 value를 모으거나 헤드 축을 되돌려 결합합니다. 행렬곱의 마지막 두 축을 확인하세요.
-- **L55** `merged = contexts.transpose(1, 2).contiguous().reshape(batch, self.dim)` — 가중치로 value를 모으거나 헤드 축을 되돌려 결합합니다. 행렬곱의 마지막 두 축을 확인하세요.
-- **L56** `logits = self.classifier(self.wo(merged)).reshape(batch, 2, 4)` — 모델을 순전파해 어휘·클래스 점수와 필요한 가중치를 얻습니다. 평가 비교에서는 같은 모델 파라미터를 사용합니다.
-- **L57** `return logits, weights` — 예측 logits와 어텐션 가중치를 함께 반환해 성능과 내부 선택을 따로 분석합니다.
-- **L61** `def evaluate(model, batch, uniform=False):` — 검증 지표를 계산합니다. no_grad와 eval을 함께 사용해 평가와 학습을 구분합니다.
-- **L62** `model.eval()` — 모델을 평가 모드로 설정합니다. 이 호출만으로 자동 미분이 꺼지지는 않습니다.
-- **L63** `keys, values, query, target, _ = batch` — 준비된 표본 묶음을 입력·정답·분석용 선택 위치로 풀어 각 계산에 전달합니다.
-- **L64** `logits, _ = model(keys, values, query, uniform)` — 모델의 순전파 결과에서 점수 또는 가중치를 받아 예측과 내부 선택을 분석합니다.
-- **L65** `correct = logits.argmax(-1) == target` — 두 답 각각의 클래스 예측을 정답과 비교해 항목별·공동 정확도를 계산할 준비를 합니다.
-- **L66–68** `return {'loss': F.cross_entropy(logits.reshape(-1, 4), target.flatten()).item(),` — 손실과 정확도 등 평가 지표를 Python 숫자 사전으로 반환합니다. item은 텐서의 스칼라를 꺼냅니다.
-- **L71** `def main():` — 옵션 파싱부터 데이터 준비, 학습, 평가와 저장까지 실행 순서를 연결합니다.
-- **L72** `parser = argparse.ArgumentParser()` — 명령행 실행 설정을 구성하거나 실제 입력 옵션을 해석합니다.
-- **L73** `parser.add_argument('--steps', type=int, default=1200)` — 실행 옵션의 이름·자료형·기본값을 등록합니다. --out을 바꾸면 이전 실험 기록을 보존할 수 있습니다.
-- **L74** `parser.add_argument('--seed', type=int, default=44)` — 실행 옵션의 이름·자료형·기본값을 등록합니다. --out을 바꾸면 이전 실험 기록을 보존할 수 있습니다.
-- **L75** `parser.add_argument('--heads', type=int, default=2)` — 실행 옵션의 이름·자료형·기본값을 등록합니다. --out을 바꾸면 이전 실험 기록을 보존할 수 있습니다.
-- **L76** `parser.add_argument('--out', default='runs/week04')` — 실행 옵션의 이름·자료형·기본값을 등록합니다. --out을 바꾸면 이전 실험 기록을 보존할 수 있습니다.
-- **L77** `args = parser.parse_args()` — 명령행 실행 설정을 구성하거나 실제 입력 옵션을 해석합니다.
-- **L78** `torch.set_num_threads(1)` — 작은 CPU 실습의 스레드 과잉 비용을 줄이고 실행 환경을 단순화합니다.
-- **L79** `torch.manual_seed(args.seed)` — 모델 초기화와 기본 난수의 시드를 설정합니다. 버전·장치가 달라지면 완전한 수치 일치까지 보장하지는 않습니다.
-- **L80** `train_rng = torch.Generator().manual_seed(args.seed + 1)` — 독립적인 난수 생성기를 만들고 시드를 고정해 학습과 평가 데이터 흐름을 통제합니다.
-- **L81** `validation = make_batch(2048, torch.Generator().manual_seed(args.seed + 1000))` — 고정 평가 표본 또는 이번 step의 학습 표본을 준비합니다. 학습·검증·테스트의 역할을 구분하세요.
-- **L82** `model = MultiRetriever(args.heads)` — 지정한 구성으로 학습 가능한 모델을 만듭니다. 저장 상태를 읽기 전에는 초기 파라미터입니다.
-- **L83** `optimizer = torch.optim.AdamW(model.parameters(), lr=0.003)` — 등록된 학습 파라미터를 AdamW로 최적화하도록 설정합니다. 학습률과 감쇠값은 코드에 명시합니다.
-- **L84** `history = [{'step': 0, **evaluate(model, validation)}]` — 업데이트 전의 검증 지표부터 기록해 학습 효과를 초기 상태와 비교할 수 있게 합니다.
-- **L85** `started = time.perf_counter()` — 학습 및 최종 진단 구간의 경과 시간 측정을 시작합니다.
-- **L86** `for step in range(1, args.steps + 1):` — 새 학습 배치를 사용해 지정한 횟수만큼 파라미터 업데이트를 반복합니다.
-- **L87** `model.train()` — 모델을 학습 모드로 되돌립니다. 검증 직후에도 이 호출이 필요합니다.
-- **L88** `keys, values, query, target, _ = make_batch(128, train_rng)` — 고정 평가 표본 또는 이번 step의 학습 표본을 준비합니다. 학습·검증·테스트의 역할을 구분하세요.
-- **L89** `logits, _ = model(keys, values, query)` — 모델의 순전파 결과에서 점수 또는 가중치를 받아 예측과 내부 선택을 분석합니다.
-- **L90** `loss = F.cross_entropy(logits.reshape(-1, 4), target.flatten())` — 소프트맥스 전 logits와 정수 정답으로 평균 교차 엔트로피를 계산합니다. -100 라벨은 기본적으로 무시됩니다.
-- **L91** `optimizer.zero_grad(set_to_none=True)` — 이전 step의 기울기를 비워 의도하지 않은 누적을 방지합니다.
-- **L92** `loss.backward()` — 손실에서 점수·투영·임베딩까지 연쇄 법칙으로 기울기를 계산합니다.
-- **L93** `nn.utils.clip_grad_norm_(model.parameters(), 1.0)` — 전체 파라미터 기울기의 노름을 제한해 큰 업데이트를 완화합니다.
-- **L94** `optimizer.step()` — 계산된 기울기와 AdamW의 상태를 사용해 파라미터를 갱신합니다.
-- **L95** `if step % 200 == 0 or step == args.steps:` — 정해진 간격과 마지막 단계에서 검증·로그를 실행합니다. 학습 step과 epoch는 다릅니다.
-- **L96** `metrics = {'step': step, 'train_loss': loss.item(), **evaluate(model, validation)}` — 학습 단계와 손실, 고정 검증 데이터의 지표를 묶습니다. 검증 후 다음 step에서 학습 모드로 복귀합니다.
-- **L97** `history.append(metrics)` — 이번 검증 지표를 순서대로 기록해 학습 곡선과 초기·최종 비교에 사용합니다.
-- **L98** `print(json.dumps(metrics))` — 현재 실행의 지표나 진단 결과를 터미널에 출력합니다. JSON 로그는 후처리하기 쉽습니다.
-- **L99** `model.eval()` — 모델을 평가 모드로 설정합니다. 이 호출만으로 자동 미분이 꺼지지는 않습니다.
-- **L100** `with torch.no_grad():` — 이 블록에서는 기울기 기록을 꺼서 검증과 구조 검사에 필요한 계산만 수행합니다.
-- **L101** `keys, values, query, _, chosen = validation` — 준비된 표본 묶음을 입력·정답·분석용 선택 위치로 풀어 각 계산에 전달합니다.
-- **L102** `_, weights = model(keys[:1], values[:1], query[:1])` — 모델의 순전파 결과에서 점수 또는 가중치를 받아 예측과 내부 선택을 분석합니다.
-- **L103** `assert weights.shape == (1, args.heads, 1, 5)` — 배치·헤드·query·key 축이 예상한 모양인지 검사합니다.
-- **L104** `assert torch.allclose(weights.sum(-1), torch.ones(1, args.heads, 1), atol=1e-6)` — key 위치 축의 가중치 합이 1인지 검사합니다.
-- **L105–109** `report = {'torch': torch.__version__, 'seed': args.seed, 'heads': args.heads,` — 환경·실험 설정·학습 이력·진단 또는 테스트 결과를 하나의 재현 가능한 기록으로 묶습니다.
-- **L110** `output = Path(args.out)` — 사용자가 지정한 결과 저장 경로를 Path 객체로 만듭니다.
-- **L111** `output.mkdir(parents=True, exist_ok=True)` — 기록과 체크포인트를 저장할 출력 폴더를 만듭니다.
-- **L112** `(output / 'metrics.json').write_text(json.dumps(report, indent=2))` — 실행 설정과 측정 기록을 JSON 파일로 저장합니다. 글의 그래프는 이 숫자에서 생성됩니다.
-- **L113** `torch.save(model.state_dict(), output / 'model.pt')` — 모델의 학습된 상태를 파일에 저장합니다. 5주차에서는 어휘와 선택 step도 함께 보관합니다.
-- **L114** `print(json.dumps({k: v for k, v in report.items() if k != 'history'}, indent=2))` — 현재 실행의 지표나 진단 결과를 터미널에 출력합니다. JSON 로그는 후처리하기 쉽습니다.
-- **L117** `if __name__ == '__main__':` — 파일을 직접 실행할 때 main을 호출하고, 다른 코드에서 import할 때는 학습을 시작하지 않도록 합니다.
-- **L118** `main()` — 명령행에서 지정한 설정으로 전체 학습 실험을 실행합니다.
-
 <a id="section-9"></a>
-## 8. 학습과 헤드 수 비교 결과
+## 7. 학습과 헤드 수 비교 결과
 
-측정 환경은 Python 3.12.14, PyTorch 2.15.0+cpu, CPU, 스레드 1개입니다. 기본 시드는 44이고 마지막 기록은 1200 step입니다. 아래 숫자와 그래프는 실제 실행에서 저장한 값입니다. 시간은 기기와 병렬 작업에 따라 달라지는 참고값입니다.
+측정 환경은 Python 3.12.14, PyTorch 2.15.0+cpu, CPU, 스레드 1개입니다. 기본 시드는 44이고 마지막 기록은 1200 step입니다.
 
 | 지표 | 학습 전 | 마지막 step |
 |---|---:|---:|
@@ -369,14 +292,14 @@ if __name__ == '__main__':
 가중치를 읽을 때 `sample_chosen`의 두 위치와 각 헤드의 최대 위치를 비교하세요. 첫 헤드가 항상 첫 정답을, 둘째가 항상 둘째 정답을 고른다고 가정하지 마세요. 헤드들의 역할이 바뀔 수도 있습니다. 색·모양의 출력은 결합된 문맥을 다시 섞은 결과이므로 헤드 하나와 클래스 하나를 단순히 동일시하기 어렵습니다.
 
 <a id="section-10"></a>
-## 9. 절제 실험을 설계하기
+## 8. 절제 실험을 설계하기
 
 균등 가중치 개입은 이미 학습한 모델의 선택 계산을 바꿉니다. 헤드 수 비교는 서로 다른 모델을 각각 처음부터 학습합니다. 두 실험은 서로 다른 질문을 다룹니다. 실험 이름에 ‘개입’과 ‘재학습 비교’를 분명히 구분하세요.
 
 추가로 헤드 하나를 0으로 만들 수 있습니다. 다만 그 결과는 학습 시 보지 못한 내부 상태이므로 성능 저하가 그 헤드의 의미를 완전히 설명하지는 않습니다. 어느 헤드가 어떤 입력 조합에 민감한지를 찾는 출발점으로 사용하세요.
 
 <a id="section-11"></a>
-## 10. 과제와 토론
+## 9. 과제와 토론
 
 1. `--heads 1`, `--heads 2`, `--heads 4`를 세 시드씩 실행하고 공동 정확도의 평균과 범위를 보고합니다. 출력 경로를 다르게 지정해 결과를 덮어쓰지 마세요.
 2. 전체 파라미터 수를 계산해 코드의 출력과 비교합니다. 임베딩, 투영, 분류기의 파라미터가 각각 얼마나 차지하는지 적습니다.
@@ -393,4 +316,3 @@ if __name__ == '__main__':
 - [PyTorch SDPA 공식 문서](https://docs.pytorch.org/docs/2.15/generated/torch.nn.functional.scaled_dot_product_attention.html): 마스크와 스케일링의 구현 의미를 확인합니다.
 - [PyTorch CrossEntropyLoss 공식 문서](https://docs.pytorch.org/docs/2.15/generated/torch.nn.CrossEntropyLoss.html): logits, 정수 타깃과 무시 인덱스를 확인합니다.
 
-이 글의 합성 데이터·실습 코드는 강의를 위해 새롭게 작성했습니다.
