@@ -10,9 +10,17 @@ from torch.nn import functional as F
 
 
 def make_batch(size, generator):
-    """두 카드 이름과 두 속성을 질의하는 검색 문제를 생성합니다.
+    """한 이름의 색과 다른 이름의 모양을 동시에 질문합니다.
 
-    카드 값은 (배치, 카드 수, 2), 질문과 정답은 각각 (배치, 2)입니다.
+    keys: (B, 5). 표본마다 중복되지 않는 이름 다섯 개입니다.
+    values: (B, 5, 2). 마지막 축은 색, 모양이며 각각 0~3입니다.
+    chosen: (B, 2). 첫 질문과 두 번째 질문의 항목 위치입니다.
+    query = keys.gather(1, chosen): (B, 2) 질문 이름을 구합니다.
+    target의 첫 열은 첫 질문 항목의 색, 둘째 열은 두 번째 항목의 모양입니다.
+    stack(..., dim=-1)으로 두 정답을 (B, 2)로 결합합니다.
+
+    두 질문이 같은 항목을 가리킬 수도 있습니다. chosen은 학습 손실이
+    아니라 가중치 분석에 사용하도록 정답과 함께 반환합니다.
     """
     keys = torch.rand(size, 12, generator=generator).argsort(-1)[:, :5]
     values = torch.randint(4, (size, 5, 2), generator=generator)
@@ -26,6 +34,17 @@ def make_batch(size, generator):
 
 class MultiRetriever(nn.Module):
     def __init__(self, heads=2, dim=32):
+        """같은 총 차원에서 헤드 수를 바꿀 수 있는 검색 모델을 만듭니다.
+
+        dim은 heads로 나누어져야 하며 dh=dim/heads입니다.
+        key는 이름 12종, color와 shape은 각 속성 4종의 임베딩입니다.
+        wq는 두 질문 임베딩을 합친 2*dim차원을 dim으로 변환합니다.
+        wk는 이름 임베딩, wv는 두 속성의 결합을 각각 dim으로 변환합니다.
+        wo는 결합된 헤드 출력을 투영합니다.
+        classifier는 색 4개와 모양 4개의 점수를 합쳐 8개 출력합니다.
+
+        heads만 바꾸면 각 헤드의 차원은 달라지지만 전체 파라미터 수는 같습니다.
+        """
         super().__init__()
         if dim % heads:
             raise ValueError('dim must be divisible by heads')
@@ -40,17 +59,32 @@ class MultiRetriever(nn.Module):
         self.classifier = nn.Linear(dim, 8)
 
     def split(self, x):
-        """마지막 표현 차원을 헤드별로 나눕니다.
+        """전체 표현을 헤드별 표현으로 나누고 축 순서를 바꿉니다.
 
-        (B, T, D)를 (B, H, T, D/H)로 변환합니다.
+        x: (B, T, D).
+        reshape(B, T, H, Dh): 마지막 D차원을 H*Dh로 나눕니다.
+        transpose(1, 2): 결과를 (B, H, T, Dh) 순서로 바꿉니다.
+        이 배치에서는 헤드별 행렬곱을 서로 독립적으로 계산할 수 있습니다.
         """
         batch, length, _ = x.shape
         return x.reshape(batch, length, self.heads, self.dh).transpose(1, 2)
 
     def forward(self, keys, values, query, uniform=False):
-        """두 질문을 헤드별로 처리해 색과 모양의 logits를 반환합니다.
+        """두 질문에서 만든 Query로 항목의 속성을 검색합니다.
 
-        logits: (B, 2, 4), weights: (B, H, 1, 카드 수).
+        keys: (B, 5), values: (B, 5, 2), query: (B, 2)입니다.
+        q_input: 두 이름 임베딩을 순서대로 이어 (B, 1, 2D)로 만듭니다.
+            질문이 두 개여도 이 구현의 Query 길이는 1입니다.
+        value_input: 색·모양 임베딩을 합쳐 (B, 5, 2D)로 만듭니다.
+        q/k/v: 투영과 split 후 (B,H,1,Dh), (B,H,5,Dh), (B,H,5,Dh)입니다.
+        scores: Q·K 내적을 sqrt(Dh)로 나눈 (B,H,1,5) 텐서입니다.
+        weights: 다섯 항목 축을 정규화합니다. 헤드 축은 정규화하지 않습니다.
+        contexts: Value 가중합이며 (B,H,1,Dh)입니다.
+        merged: 축을 되돌려 헤드들을 이어 붙인 (B,D) 문맥입니다.
+        wo와 classifier: 이를 색과 모양의 (B,2,4) logits로 바꿉니다.
+
+        반환한 weights에서 각 헤드가 두 질문 중 어느 항목에 가중치를
+        주는지 확인할 수 있습니다. 헤드 역할은 미리 지정하지 않습니다.
         """
         batch = keys.size(0)
         q_input = self.key(query).reshape(batch, 1, 2 * self.dim)
@@ -75,9 +109,16 @@ class MultiRetriever(nn.Module):
 
 @torch.no_grad()
 def evaluate(model, batch, uniform=False):
-    """기울기를 기록하지 않고 손실과 정확도를 계산합니다.
+    """항목별 정확도와 두 답을 모두 맞힌 비율을 측정합니다.
 
-    실습별로 선택 위치, 검색 위치 또는 답 위치도 함께 측정합니다.
+    logits.reshape(-1, 4)는 (B,2,4)를 (B*2,4)로 변환합니다.
+    target.flatten()은 같은 순서의 (B*2,) 라벨입니다.
+    cross_entropy는 두 답에 대한 평균 손실입니다.
+    correct는 (B,2)이며 각 답의 정답 여부를 표시합니다.
+    accuracy는 모든 답의 평균 정확도입니다.
+    joint_accuracy는 correct.all(-1), 즉 두 답이 모두 맞은 표본의 비율입니다.
+
+    uniform을 지정하면 모든 헤드에서 항목 가중치를 동일하게 바꾸어 평가합니다.
     """
     model.eval()
     keys, values, query, target, _ = batch
@@ -89,7 +130,18 @@ def evaluate(model, batch, uniform=False):
 
 
 def main():
-    """실행 옵션을 읽고 학습, 검증과 결과 저장을 순서대로 수행합니다."""
+    """헤드 수에 따른 두 속성 검색 모델의 학습 결과를 기록합니다.
+
+    --heads는 총 차원 32를 나눌 헤드 수입니다. 다른 조건을 유지한
+    헤드 수 비교가 가능하도록 임베딩과 전체 투영 크기는 바꾸지 않습니다.
+    검증 2,048개를 고정하고 매 단계 학습 표본 128개를 새로 생성합니다.
+    두 답의 logits를 (B*2,4)로, target을 (B*2,)로 바꿔 손실을 계산합니다.
+    역전파와 AdamW 갱신을 수행하고 200단계마다 항목별·공동 정확도를 기록합니다.
+
+    마지막에는 가중치의 (1,H,1,5) 모양과 항목 축 합을 검사합니다.
+    파라미터 수, 헤드별 표본 가중치, 균등 개입 결과를 metrics.json에
+    함께 저장하고 model.pt에 모델 상태를 보관합니다.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument('--steps', type=int, default=1200)
     parser.add_argument('--seed', type=int, default=44)
