@@ -103,7 +103,7 @@ context = weights V
 <a id="section-7"></a>
 ## 실습 준비
 
-Python 3.12에서 실행할 수 있습니다. PyTorch를 설치한 뒤 [week05.py](/attention-course/week05.py)를 내려받아 실행하세요. 아래 코드와 내려받는 파일은 같습니다.
+Python 3.12에서 실행할 수 있습니다. PyTorch를 설치한 뒤 [week05.py](https://teimakes.github.io/attention-course/week05.py)를 내려받아 실행하세요. 아래 코드와 내려받는 파일은 같습니다.
 
 ```bash
 python -m pip install torch==2.15.0
@@ -333,7 +333,7 @@ if __name__ == '__main__':
 | 교차 엔트로피 | 2.71888 | 0.98709 |
 | 정확도 | 31.25% | 100.00% |
 
-![검증 손실과 정확도 그래프](/attention-course/week05-learning.svg)
+![검증 손실과 정확도 그래프](https://teimakes.github.io/attention-course/week05-learning.svg)
 
 학습·검증·테스트 문장은 각각 42, 16, 14개입니다. 검증 손실로 선택한 단계는 100이며 테스트 답 정확도는 100.00%입니다.
 
@@ -352,9 +352,9 @@ if __name__ == '__main__':
 | 55 | 21.43% |
 | 65 | 100.00% |
 
-![세 시드의 검증 손실과 답 정확도](/attention-course/week05-seeds.svg)
+![세 시드의 검증 손실과 답 정확도](https://teimakes.github.io/attention-course/week05-seeds.svg)
 
-[측정 기록 보기](/attention-course/week05-metrics.json)
+[측정 기록 보기](https://teimakes.github.io/attention-course/week05-metrics.json)
 
 
 학습 손실이 계속 감소하더라도 검증 손실은 다시 증가할 수 있습니다. 이 코드가 검증 손실이 가장 낮았을 때의 모델을 저장하는 이유입니다. 마지막 단계의 파라미터와 검증 기준으로 선택한 파라미터는 다를 수 있습니다.

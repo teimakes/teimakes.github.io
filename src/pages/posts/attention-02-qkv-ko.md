@@ -92,7 +92,7 @@ Query와 Key의 각 성분이 평균 0, 분산 1인 독립 확률변수라고 �
 <a id="section-6"></a>
 ## 실습 준비
 
-Python 3.12에서 실행할 수 있습니다. PyTorch를 설치한 뒤 [week02.py](/attention-course/week02.py)를 내려받아 실행하세요. 아래 코드와 내려받는 파일은 같습니다.
+Python 3.12에서 실행할 수 있습니다. PyTorch를 설치한 뒤 [week02.py](https://teimakes.github.io/attention-course/week02.py)를 내려받아 실행하세요. 아래 코드와 내려받는 파일은 같습니다.
 
 ```bash
 python -m pip install torch==2.15.0
@@ -240,7 +240,7 @@ if __name__ == '__main__':
 | 정확도 | 14.50% | 100.00% |
 | 검색 위치 정확도 | 13.72% | 100.00% |
 
-![검증 손실과 정확도 그래프](/attention-course/week02-learning.svg)
+![검증 손실과 정확도 그래프](https://teimakes.github.io/attention-course/week02-learning.svg)
 
 학습한 모델의 가중치를 균등하게 바꿨을 때 정확도는 42.68%였습니다.
 
@@ -250,7 +250,7 @@ if __name__ == '__main__':
 | 52 | 100.00% |
 | 62 | 100.00% |
 
-[측정 기록 보기](/attention-course/week02-metrics.json)
+[측정 기록 보기](https://teimakes.github.io/attention-course/week02-metrics.json)
 
 
 `accuracy`는 출력한 값이 정답과 일치한 비율이고, `retrieval_accuracy`는 가중치가 가장 높은 항목이 정답 위치인 비율입니다. 두 지표는 항상 같지 않습니다. 다른 항목을 선택하더라도 우연히 값이 같으면 최종 값은 맞힐 수 있기 때문입니다.

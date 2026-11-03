@@ -100,7 +100,7 @@ Query 2          허용    허용    허용
 <a id="section-6"></a>
 ## 실습 준비
 
-Python 3.12에서 실행할 수 있습니다. PyTorch를 설치한 뒤 [week03.py](/attention-course/week03.py)를 내려받아 실행하세요. 아래 코드와 내려받는 파일은 같습니다.
+Python 3.12에서 실행할 수 있습니다. PyTorch를 설치한 뒤 [week03.py](https://teimakes.github.io/attention-course/week03.py)를 내려받아 실행하세요. 아래 코드와 내려받는 파일은 같습니다.
 
 ```bash
 python -m pip install torch==2.15.0
@@ -248,7 +248,7 @@ if __name__ == '__main__':
 | 정확도 | 12.55% | 100.00% |
 | 첫 위치의 평균 가중치 | 0.14828 | 0.99999 |
 
-![검증 손실과 정확도 그래프](/attention-course/week03-learning.svg)
+![검증 손실과 정확도 그래프](https://teimakes.github.io/attention-course/week03-learning.svg)
 
 | 시드 | 마지막 단계의 검증 정확도 |
 |---|---:|
@@ -256,7 +256,7 @@ if __name__ == '__main__':
 | 53 | 100.00% |
 | 63 | 100.00% |
 
-[측정 기록 보기](/attention-course/week03-metrics.json)
+[측정 기록 보기](https://teimakes.github.io/attention-course/week03-metrics.json)
 
 
 `accuracy`는 QUERY 위치에서 첫 번째 숫자를 맞힌 비율입니다. 정답 종류가 여덟 개이므로 균등하게 임의 선택하면 기대 정확도는 12.5%입니다. `first_mass`는 마지막 위치가 첫 번째 위치에 부여한 평균 가중치입니다.

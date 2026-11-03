@@ -72,7 +72,7 @@ output = concat(head₁, …, headH) Wₒ
 <a id="section-5"></a>
 ## 실습 준비
 
-Python 3.12에서 실행할 수 있습니다. PyTorch를 설치한 뒤 [week04.py](/attention-course/week04.py)를 내려받아 실행하세요. 아래 코드와 내려받는 파일은 같습니다.
+Python 3.12에서 실행할 수 있습니다. PyTorch를 설치한 뒤 [week04.py](https://teimakes.github.io/attention-course/week04.py)를 내려받아 실행하세요. 아래 코드와 내려받는 파일은 같습니다.
 
 ```bash
 python -m pip install torch==2.15.0
@@ -238,7 +238,7 @@ if __name__ == '__main__':
 | 정확도 | 22.27% | 100.00% |
 | 공동 정확도 | 4.54% | 100.00% |
 
-![검증 손실과 정확도 그래프](/attention-course/week04-learning.svg)
+![검증 손실과 정확도 그래프](https://teimakes.github.io/attention-course/week04-learning.svg)
 
 학습한 모델의 가중치를 균등하게 바꿨을 때 정확도는 48.85%였습니다.
 
@@ -250,7 +250,7 @@ if __name__ == '__main__':
 | 54 | 100.00% |
 | 64 | 100.00% |
 
-[측정 기록 보기](/attention-course/week04-metrics.json)
+[측정 기록 보기](https://teimakes.github.io/attention-course/week04-metrics.json)
 
 
 `accuracy`는 두 정답을 각각 평가한 정확도입니다. `joint_accuracy`는 한 표본에서 두 정답을 모두 맞힌 비율입니다. 두 결과를 구분해야 합니다. 독립적인 균등 추측이라면 항목별 기대 정확도는 25%, 두 개를 모두 맞힐 기대 비율은 6.25%입니다.

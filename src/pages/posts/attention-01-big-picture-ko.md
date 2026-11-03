@@ -22,7 +22,7 @@ tags: ['attention', 'transformer', 'pytorch', 'deep-learning']
 
 트랜스포머는 토큰 임베딩에 위치 정보를 더한 뒤 여러 블록을 통과시킵니다. 각 블록에는 어텐션과 피드포워드 신경망이 들어갑니다. 언어 모델은 마지막으로 각 위치의 표현을 어휘 크기의 점수로 변환하고 다음 토큰을 예측합니다. 아래 그림은 5편에서 구현할 디코더의 구조입니다. 이번 글에서는 이 중 어텐션의 가중합을 먼저 다룹니다.
 
-![토큰 임베딩, 어텐션, FFN과 출력 계층으로 구성된 디코더 구조](/attention-course/architecture.svg)
+![토큰 임베딩, 어텐션, FFN과 출력 계층으로 구성된 디코더 구조](https://teimakes.github.io/attention-course/architecture.svg)
 
 <a id="section-1"></a>
 ## 실습 문제
@@ -98,7 +98,7 @@ g = ∂L/∂c
 <a id="section-5"></a>
 ## 실습 준비
 
-Python 3.12에서 실행할 수 있습니다. PyTorch를 설치한 뒤 [week01.py](/attention-course/week01.py)를 내려받아 실행하세요. 아래 코드와 내려받는 파일은 같습니다.
+Python 3.12에서 실행할 수 있습니다. PyTorch를 설치한 뒤 [week01.py](https://teimakes.github.io/attention-course/week01.py)를 내려받아 실행하세요. 아래 코드와 내려받는 파일은 같습니다.
 
 ```bash
 python -m pip install torch==2.15.0
@@ -239,7 +239,7 @@ if __name__ == '__main__':
 | 정확도 | 56.54% | 99.85% |
 | 표식 위치의 평균 가중치 | 0.15354 | 0.98967 |
 
-![검증 손실과 정확도 그래프](/attention-course/week01-learning.svg)
+![검증 손실과 정확도 그래프](https://teimakes.github.io/attention-course/week01-learning.svg)
 
 학습한 모델의 가중치를 균등하게 바꿨을 때 정확도는 60.94%였습니다.
 
@@ -249,7 +249,7 @@ if __name__ == '__main__':
 | 51 | 99.66% |
 | 61 | 99.76% |
 
-[측정 기록 보기](/attention-course/week01-metrics.json)
+[측정 기록 보기](https://teimakes.github.io/attention-course/week01-metrics.json)
 
 
 `accuracy`는 분류 정확도이고 `selected_mass`는 표식 위치에 부여한 평균 가중치입니다. 두 지표를 함께 보면 최종 분류 성능과 입력 선택의 변화를 각각 확인할 수 있습니다.
