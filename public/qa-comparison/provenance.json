@@ -1,0 +1,13 @@
+{
+  "dataset_draft_date": "2026-10-24",
+  "experiment_date": "2026-11-03",
+  "generation_calls": 28,
+  "source_sha256": {
+    "prompts.py": "37ead8421a47c661a21292c6f0a8ce73ecfaa8b0fb979ef09433e1c1db20dfeb",
+    "scoring.py": "933fe6189b0369dad00df80b9e2d6f5cde22dab17cb11786afe2d40476a56b76",
+    "data/handbook.txt": "ae68162e79758836c600bb0b0c98ce25b3dcbb20d53f4d391440f84f0ae0ff08",
+    "data/dev.jsonl": "25026914a4f45c71aeace09e32db180cc0f11039f5d7240bd021e9506eb35c94",
+    "data/holdout.jsonl": "40e82f6b80b2934fce3ef461bd8136dc1f14eba7c37e51a0f761019ae312139b"
+  },
+  "api_response_export": "request, parsed answer, metrics and usage preserved; provider response IDs and nonessential response metadata removed"
+}

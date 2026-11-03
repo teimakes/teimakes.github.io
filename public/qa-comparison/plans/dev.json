@@ -1,0 +1,181 @@
+{
+  "version": 1,
+  "config": {
+    "model": "gpt-6-luna",
+    "reasoning_effort": "none",
+    "max_output_tokens": 1024,
+    "top_k": 5,
+    "input_usd_per_million": 0.1,
+    "cached_usd_per_million": 0.01,
+    "output_usd_per_million": 0.5,
+    "input_reserve_usd_per_million": 0.25,
+    "project_cap_usd": 0.25,
+    "price_checked_date": "2026-11-03",
+    "price_source": "https://developers.openai.com/api/docs/pricing",
+    "stop_before_utc": "2026-11-06T15:00:00+00:00"
+  },
+  "split": "dev",
+  "limit": 0,
+  "repeats": 1,
+  "calls": [
+    {
+      "key": "dev-01:0:full",
+      "request_sha256": "4065ae657c11c2fa403cc2fa0f46af5c1c319f575717c071d3235fc0aaaaec14",
+      "input_byte_bound": 20650,
+      "reserved_usd": 0.0056745
+    },
+    {
+      "key": "dev-01:0:rag",
+      "request_sha256": "4ee02261e1e0acc8eb70218ab526346af0d776f76ec1a1c7056089318b5f4cf7",
+      "input_byte_bound": 5477,
+      "reserved_usd": 0.00188125
+    },
+    {
+      "key": "dev-02:0:rag",
+      "request_sha256": "8f5a5ec9056df9e33b5ca5f37507d2d77ebcc08de796b2bdd1f655dae3930aba",
+      "input_byte_bound": 5996,
+      "reserved_usd": 0.002011
+    },
+    {
+      "key": "dev-02:0:full",
+      "request_sha256": "0673197dfb9fec11d02d609adb50bc66e70b88bd4cb5fcf55266c605b0a64eb2",
+      "input_byte_bound": 20709,
+      "reserved_usd": 0.00568925
+    },
+    {
+      "key": "dev-03:0:full",
+      "request_sha256": "acceb7aa0557db938a6c008bc64cc4b4f65599fbd46c93ba79b4701c6fb7b535",
+      "input_byte_bound": 20711,
+      "reserved_usd": 0.00568975
+    },
+    {
+      "key": "dev-03:0:rag",
+      "request_sha256": "a13cabe68f6aa53906a4bb159d69a2d8d3de30984a1c96dcfd96881aa85d4e15",
+      "input_byte_bound": 5491,
+      "reserved_usd": 0.00188475
+    },
+    {
+      "key": "dev-04:0:rag",
+      "request_sha256": "309235519a8320715386b568d3e0d92ccfcd3932ac7b553e09ee4fed97aa7d68",
+      "input_byte_bound": 5748,
+      "reserved_usd": 0.001949
+    },
+    {
+      "key": "dev-04:0:full",
+      "request_sha256": "38d662a72e00d07cb70aa5d8bbc91035cea7efb4879c7db402a9c51714b98266",
+      "input_byte_bound": 20745,
+      "reserved_usd": 0.00569825
+    },
+    {
+      "key": "dev-05:0:full",
+      "request_sha256": "2e9c0160a446f936c2208579418a1607bbde7e66ff99c7894f31e67f0b4191a7",
+      "input_byte_bound": 20700,
+      "reserved_usd": 0.005687
+    },
+    {
+      "key": "dev-05:0:rag",
+      "request_sha256": "ed81d5253cc26a2dce0abcc5bc4660fedd77bf3263b8e41de7784bc1c9315c2b",
+      "input_byte_bound": 5971,
+      "reserved_usd": 0.00200475
+    },
+    {
+      "key": "dev-06:0:rag",
+      "request_sha256": "d3d2be889b21a5829cc674899900046fb83a60ea7cfbd463e52820de1bf84d37",
+      "input_byte_bound": 5360,
+      "reserved_usd": 0.001852
+    },
+    {
+      "key": "dev-06:0:full",
+      "request_sha256": "044dcedcc6eeb90e8042e2525ba7d541b3a0eb4edf0d1cdbc230d463271bda1c",
+      "input_byte_bound": 20686,
+      "reserved_usd": 0.0056835
+    },
+    {
+      "key": "dev-07:0:full",
+      "request_sha256": "e6c7a8b67f19dc174a0a37ccaf6e3ddea7675a8c9918c937c16bc3c5cb2c9eb3",
+      "input_byte_bound": 20711,
+      "reserved_usd": 0.00568975
+    },
+    {
+      "key": "dev-07:0:rag",
+      "request_sha256": "e5f7700029856b022335e16e1fd34cedf4b6c087f5959398593b088b387aca25",
+      "input_byte_bound": 5635,
+      "reserved_usd": 0.00192075
+    },
+    {
+      "key": "dev-08:0:rag",
+      "request_sha256": "fd9aacf9ef720adc8500cc605c02adcf6e48edc40b7e09f394f23a41e65a368e",
+      "input_byte_bound": 5568,
+      "reserved_usd": 0.001904
+    },
+    {
+      "key": "dev-08:0:full",
+      "request_sha256": "9ee3bb9022436589ba39974c54f3a3cc93db9ef8e2ba54cc627ea3edf0b4acc5",
+      "input_byte_bound": 20737,
+      "reserved_usd": 0.00569625
+    },
+    {
+      "key": "dev-09:0:full",
+      "request_sha256": "4fea3c956285312828eca63388173d40d642efe5598bf85b1e2de2200fd684b9",
+      "input_byte_bound": 20641,
+      "reserved_usd": 0.00567225
+    },
+    {
+      "key": "dev-09:0:rag",
+      "request_sha256": "6e503b1acefe9827e14d58784ffe3650172824463edcba9210017a441c1d9b8f",
+      "input_byte_bound": 5848,
+      "reserved_usd": 0.001974
+    },
+    {
+      "key": "dev-10:0:rag",
+      "request_sha256": "0a5065c84fdb6c61234269bc399e45ea1ec08853b2c554152f1241ddab4e71d4",
+      "input_byte_bound": 5766,
+      "reserved_usd": 0.0019535
+    },
+    {
+      "key": "dev-10:0:full",
+      "request_sha256": "52e44082c99c2eaaff9adda98b921db65fc643f98fa35e8fd95396c3d3cb67a0",
+      "input_byte_bound": 20666,
+      "reserved_usd": 0.0056785
+    },
+    {
+      "key": "dev-11:0:full",
+      "request_sha256": "ab9c1cafaa7f83f7ec9ef6ceba88ffdd05ecb6e4e4f2e34daf2d0c0cc63e1a66",
+      "input_byte_bound": 20660,
+      "reserved_usd": 0.005677
+    },
+    {
+      "key": "dev-11:0:rag",
+      "request_sha256": "b54bd3f0c314af4bbce64dc07014f60400a67e8f48b870c7042c4ce6bf8374d7",
+      "input_byte_bound": 4778,
+      "reserved_usd": 0.0017065
+    },
+    {
+      "key": "dev-12:0:rag",
+      "request_sha256": "2bfd31927d6747386f163e5545772aad1e6702021e92618399d962c69d3a8300",
+      "input_byte_bound": 5857,
+      "reserved_usd": 0.00197625
+    },
+    {
+      "key": "dev-12:0:full",
+      "request_sha256": "b9aac95d9091a31da31fd1ab6b6edcf14dbf2ee53de20a4f102a29781fc7242c",
+      "input_byte_bound": 20687,
+      "reserved_usd": 0.00568375
+    }
+  ],
+  "max_calls": 24,
+  "reserved_usd": 0.0912375,
+  "files": {
+    "data/dev.jsonl": "25026914a4f45c71aeace09e32db180cc0f11039f5d7240bd021e9506eb35c94",
+    "data/handbook.txt": "ae68162e79758836c600bb0b0c98ce25b3dcbb20d53f4d391440f84f0ae0ff08",
+    "data/holdout.jsonl": "40e82f6b80b2934fce3ef461bd8136dc1f14eba7c37e51a0f761019ae312139b",
+    "experiment.py": "1c094310785d579a6061200e2fe264719a4280546ebf01dedd7aad0a2cb93e5b",
+    "musique_adapter.py": "6070827522aa718901c8b00af762cc9d6fc8a7ad45b7eb41480b57d2eb5826a7",
+    "prompts.py": "37ead8421a47c661a21292c6f0a8ce73ecfaa8b0fb979ef09433e1c1db20dfeb",
+    "retrieval.py": "10f48abc41cf5810ad18c8fb2fd7968b5e13224dda975da7c363c082d3afd4bb",
+    "review.py": "3dbee2405af0a113729301efd095ca8998d30013dc1ccb64bb33b98cbd35de1e",
+    "scoring.py": "933fe6189b0369dad00df80b9e2d6f5cde22dab17cb11786afe2d40476a56b76"
+  },
+  "status": "AWAITING_APPROVAL_NO_LIVE_RESULTS",
+  "plan_sha256": "060855a31e64deb5db17982bd007803c0ad361680f0028a411996a614481ac7e"
+}

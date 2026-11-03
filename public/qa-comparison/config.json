@@ -1,0 +1,14 @@
+{
+  "model": "gpt-6-luna",
+  "reasoning_effort": "none",
+  "max_output_tokens": 1024,
+  "top_k": 5,
+  "input_usd_per_million": 0.1,
+  "cached_usd_per_million": 0.01,
+  "output_usd_per_million": 0.5,
+  "input_reserve_usd_per_million": 0.25,
+  "project_cap_usd": 0.25,
+  "price_checked_date": "2026-11-03",
+  "price_source": "https://developers.openai.com/api/docs/pricing",
+  "stop_before_utc": "2026-11-06T15:00:00+00:00"
+}

@@ -1,0 +1,135 @@
+{
+  "arms": {
+    "full": {
+      "planned": 12,
+      "attempted": 12,
+      "success": 12,
+      "structured_match_rate": 1.0,
+      "citation_f1_mean_all_planned": 0.9055555555555556,
+      "unattempted": 0,
+      "semantic_faithfulness": "PENDING_HUMAN_REVIEW",
+      "input_tokens": 57308,
+      "cached_input_tokens": 9538,
+      "output_tokens": 843,
+      "reasoning_tokens": 0,
+      "token_cost_estimate_usd": 0.00529388,
+      "token_cost_conservative_usd": 0.0147485,
+      "usage_coverage": 1.0,
+      "api_latency_s_p50": 6.505439603501145,
+      "api_latency_s_p95": 7.083477452004445,
+      "retrieval_s_p50": 0.0,
+      "retrieval_s_p95": 0.0,
+      "e2e_s_p50": 6.5059334195029805,
+      "e2e_s_p95": 7.083986967998499
+    },
+    "rag": {
+      "planned": 12,
+      "attempted": 12,
+      "success": 12,
+      "structured_match_rate": 0.9166666666666666,
+      "citation_f1_mean_all_planned": 0.8916666666666666,
+      "unattempted": 0,
+      "semantic_faithfulness": "PENDING_HUMAN_REVIEW",
+      "input_tokens": 12778,
+      "cached_input_tokens": 2208,
+      "output_tokens": 828,
+      "reasoning_tokens": 0,
+      "token_cost_estimate_usd": 0.0014930800000000001,
+      "token_cost_conservative_usd": 0.0036085,
+      "usage_coverage": 1.0,
+      "api_latency_s_p50": 6.3081836985002155,
+      "api_latency_s_p95": 7.199513332998322,
+      "retrieval_s_p50": 0.0002964154955407139,
+      "retrieval_s_p95": 0.000358306999260094,
+      "e2e_s_p50": 6.309034029498434,
+      "e2e_s_p95": 7.200526895001531
+    }
+  },
+  "paired": [
+    {
+      "id": "dev-01",
+      "repeat": 0,
+      "full_correct": 1,
+      "rag_correct": 1,
+      "rag_minus_full_tokens": -3723
+    },
+    {
+      "id": "dev-02",
+      "repeat": 0,
+      "full_correct": 1,
+      "rag_correct": 0,
+      "rag_minus_full_tokens": -3607
+    },
+    {
+      "id": "dev-03",
+      "repeat": 0,
+      "full_correct": 1,
+      "rag_correct": 1,
+      "rag_minus_full_tokens": -3770
+    },
+    {
+      "id": "dev-04",
+      "repeat": 0,
+      "full_correct": 1,
+      "rag_correct": 1,
+      "rag_minus_full_tokens": -3722
+    },
+    {
+      "id": "dev-05",
+      "repeat": 0,
+      "full_correct": 1,
+      "rag_correct": 1,
+      "rag_minus_full_tokens": -3573
+    },
+    {
+      "id": "dev-06",
+      "repeat": 0,
+      "full_correct": 1,
+      "rag_correct": 1,
+      "rag_minus_full_tokens": -3760
+    },
+    {
+      "id": "dev-07",
+      "repeat": 0,
+      "full_correct": 1,
+      "rag_correct": 1,
+      "rag_minus_full_tokens": -3731
+    },
+    {
+      "id": "dev-08",
+      "repeat": 0,
+      "full_correct": 1,
+      "rag_correct": 1,
+      "rag_minus_full_tokens": -3720
+    },
+    {
+      "id": "dev-09",
+      "repeat": 0,
+      "full_correct": 1,
+      "rag_correct": 1,
+      "rag_minus_full_tokens": -3643
+    },
+    {
+      "id": "dev-10",
+      "repeat": 0,
+      "full_correct": 1,
+      "rag_correct": 1,
+      "rag_minus_full_tokens": -3698
+    },
+    {
+      "id": "dev-11",
+      "repeat": 0,
+      "full_correct": 1,
+      "rag_correct": 1,
+      "rag_minus_full_tokens": -3949
+    },
+    {
+      "id": "dev-12",
+      "repeat": 0,
+      "full_correct": 1,
+      "rag_correct": 1,
+      "rag_minus_full_tokens": -3634
+    }
+  ],
+  "warning": "Costs are token estimates, not billing balance. Small single-document pilot."
+}

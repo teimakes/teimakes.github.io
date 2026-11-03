@@ -1,0 +1,3 @@
+﻿arm,planned,attempted,success,structured_match_rate,citation_f1_mean_all_planned,unattempted,semantic_faithfulness,input_tokens,cached_input_tokens,output_tokens,reasoning_tokens,token_cost_estimate_usd,token_cost_conservative_usd,usage_coverage,api_latency_s_p50,api_latency_s_p95,retrieval_s_p50,retrieval_s_p95,e2e_s_p50,e2e_s_p95
+full,12,12,12,1.0,0.9055555555555556,0,PENDING_HUMAN_REVIEW,57308,9538,843,0,0.00529388,0.0147485,1.0,6.505439603501145,7.083477452004445,0.0,0.0,6.5059334195029805,7.083986967998499
+rag,12,12,12,0.9166666666666666,0.8916666666666666,0,PENDING_HUMAN_REVIEW,12778,2208,828,0,0.0014930800000000001,0.0036085,1.0,6.3081836985002155,7.199513332998322,0.0002964154955407139,0.000358306999260094,6.309034029498434,7.200526895001531

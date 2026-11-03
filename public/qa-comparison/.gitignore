@@ -1,0 +1,6 @@
+.env*
+.venv/
+__pycache__/
+account.json
+outputs/
+budget-ledger*

@@ -1,0 +1,181 @@
+{
+  "version": 1,
+  "config": {
+    "model": "gpt-6-luna",
+    "reasoning_effort": "none",
+    "max_output_tokens": 1024,
+    "top_k": 5,
+    "input_usd_per_million": 0.1,
+    "cached_usd_per_million": 0.01,
+    "output_usd_per_million": 0.5,
+    "input_reserve_usd_per_million": 0.25,
+    "project_cap_usd": 0.25,
+    "price_checked_date": "2026-11-03",
+    "price_source": "https://developers.openai.com/api/docs/pricing",
+    "stop_before_utc": "2026-11-06T15:00:00+00:00"
+  },
+  "split": "holdout",
+  "limit": 0,
+  "repeats": 1,
+  "calls": [
+    {
+      "key": "holdout-01:0:full",
+      "request_sha256": "8c7e19bf7caad10a61ec9f800fc19d31dbed4c3ce11f6c59df227d3c55b9e94e",
+      "input_byte_bound": 20716,
+      "reserved_usd": 0.005691
+    },
+    {
+      "key": "holdout-01:0:rag",
+      "request_sha256": "d9d48b7806f9c5ccf140d9ceaf190683cf8a749f2d98ed1910346e2375222a3a",
+      "input_byte_bound": 5520,
+      "reserved_usd": 0.001892
+    },
+    {
+      "key": "holdout-02:0:rag",
+      "request_sha256": "b2a072e0373e1887f26d2a8754cbeb9b1cd22a87acb531e3f55429dd045f4ea7",
+      "input_byte_bound": 5820,
+      "reserved_usd": 0.001967
+    },
+    {
+      "key": "holdout-02:0:full",
+      "request_sha256": "14606acba85bad6003bd2137c0c40bf963b988481d2527df6f59abaacc8c4521",
+      "input_byte_bound": 20701,
+      "reserved_usd": 0.00568725
+    },
+    {
+      "key": "holdout-03:0:full",
+      "request_sha256": "012737fd719bc94e38f9c8bee38e3e216393c9758a0110842e995b1fd0dcd428",
+      "input_byte_bound": 20763,
+      "reserved_usd": 0.00570275
+    },
+    {
+      "key": "holdout-03:0:rag",
+      "request_sha256": "be37e4354c7bb85acd038d07f0e8782e34b85a382e4486b144e1fedea069c8f9",
+      "input_byte_bound": 5903,
+      "reserved_usd": 0.00198775
+    },
+    {
+      "key": "holdout-04:0:rag",
+      "request_sha256": "3be1647288fb877185b618093c5ce8baf4048556b3864ad62facad022ff5add9",
+      "input_byte_bound": 5543,
+      "reserved_usd": 0.00189775
+    },
+    {
+      "key": "holdout-04:0:full",
+      "request_sha256": "d686e7730777ef1efad3539641960d4ff3b2342663647236dae3daebf9f9f29e",
+      "input_byte_bound": 20683,
+      "reserved_usd": 0.00568275
+    },
+    {
+      "key": "holdout-05:0:full",
+      "request_sha256": "679f974b62b801e5cdc1bedec13adcae98a74ef70c79515a0b709131c4ec61ad",
+      "input_byte_bound": 20716,
+      "reserved_usd": 0.005691
+    },
+    {
+      "key": "holdout-05:0:rag",
+      "request_sha256": "4cf521ab99e8db0fb233bc4a28410616d64d2ac6a57a6ffe9d4a97680e97bdf6",
+      "input_byte_bound": 5852,
+      "reserved_usd": 0.001975
+    },
+    {
+      "key": "holdout-06:0:rag",
+      "request_sha256": "672ce93e31ca96ef08e7a771f8375d73403a9feb75159db7b5c903584f202d56",
+      "input_byte_bound": 6417,
+      "reserved_usd": 0.00211625
+    },
+    {
+      "key": "holdout-06:0:full",
+      "request_sha256": "198c83f4b3555e6af3a222cd3bedc1847cfe53aa7ac4036866ea4b29bc259a53",
+      "input_byte_bound": 20753,
+      "reserved_usd": 0.00570025
+    },
+    {
+      "key": "holdout-07:0:full",
+      "request_sha256": "23a8956ffaf7d746a5b23af5fe74a6d8daf7e5fa164e17a42d8469baa981d3dc",
+      "input_byte_bound": 20698,
+      "reserved_usd": 0.0056865
+    },
+    {
+      "key": "holdout-07:0:rag",
+      "request_sha256": "374c302a33dde28d3e5abbe4f4c1d6a0b013f4584637053b53c5c4c459a8b43e",
+      "input_byte_bound": 5769,
+      "reserved_usd": 0.00195425
+    },
+    {
+      "key": "holdout-08:0:rag",
+      "request_sha256": "090f19a24d2a68749ecfd5381c68b0e8e8e937c6cf01dd8395030002fc69e2df",
+      "input_byte_bound": 5765,
+      "reserved_usd": 0.00195325
+    },
+    {
+      "key": "holdout-08:0:full",
+      "request_sha256": "8ceafbe678503193bb8d6a7f16f837043057e2b1ab800677270ee11b6d09ca6c",
+      "input_byte_bound": 20746,
+      "reserved_usd": 0.0056985
+    },
+    {
+      "key": "holdout-09:0:full",
+      "request_sha256": "d177e1a327b359983b51546af005d901f1ea10882734defe9c4652dca47c8ef5",
+      "input_byte_bound": 20658,
+      "reserved_usd": 0.0056765
+    },
+    {
+      "key": "holdout-09:0:rag",
+      "request_sha256": "6698577a4512202b1e5643305be68c554f05a104b214e268dd88510f222941a1",
+      "input_byte_bound": 5203,
+      "reserved_usd": 0.00181275
+    },
+    {
+      "key": "holdout-10:0:rag",
+      "request_sha256": "2a9ffb56c39dc0c568a4180251cdc555a1c90836dfb7f9e0c0b46af3aff0874d",
+      "input_byte_bound": 5206,
+      "reserved_usd": 0.0018135
+    },
+    {
+      "key": "holdout-10:0:full",
+      "request_sha256": "5d82a8d6028b044750ba0cf273dbe31ec7c530321c740bbe066dca7dc5a8c579",
+      "input_byte_bound": 20669,
+      "reserved_usd": 0.00567925
+    },
+    {
+      "key": "holdout-11:0:full",
+      "request_sha256": "418a2cd1709968eaf62402ebe248608b9980885d2dd6c78ce516747120b4b565",
+      "input_byte_bound": 20660,
+      "reserved_usd": 0.005677
+    },
+    {
+      "key": "holdout-11:0:rag",
+      "request_sha256": "02731f8cefd28ef5b3eb9296a0d14d833ff66ce325aaaa1689e2d14b1c99cda5",
+      "input_byte_bound": 5166,
+      "reserved_usd": 0.0018035
+    },
+    {
+      "key": "holdout-12:0:rag",
+      "request_sha256": "ec925194ae4822b7537ff48ae06263d28b4aca426084aa1366b01f6b81124fea",
+      "input_byte_bound": 5982,
+      "reserved_usd": 0.0020075
+    },
+    {
+      "key": "holdout-12:0:full",
+      "request_sha256": "8d616b0344299ccc4e1e67e39864456675623bc84f87ceaf30a2306b084813ec",
+      "input_byte_bound": 20685,
+      "reserved_usd": 0.00568325
+    }
+  ],
+  "max_calls": 24,
+  "reserved_usd": 0.0914365,
+  "files": {
+    "data/dev.jsonl": "25026914a4f45c71aeace09e32db180cc0f11039f5d7240bd021e9506eb35c94",
+    "data/handbook.txt": "ae68162e79758836c600bb0b0c98ce25b3dcbb20d53f4d391440f84f0ae0ff08",
+    "data/holdout.jsonl": "40e82f6b80b2934fce3ef461bd8136dc1f14eba7c37e51a0f761019ae312139b",
+    "experiment.py": "1c094310785d579a6061200e2fe264719a4280546ebf01dedd7aad0a2cb93e5b",
+    "musique_adapter.py": "6070827522aa718901c8b00af762cc9d6fc8a7ad45b7eb41480b57d2eb5826a7",
+    "prompts.py": "37ead8421a47c661a21292c6f0a8ce73ecfaa8b0fb979ef09433e1c1db20dfeb",
+    "retrieval.py": "10f48abc41cf5810ad18c8fb2fd7968b5e13224dda975da7c363c082d3afd4bb",
+    "review.py": "3dbee2405af0a113729301efd095ca8998d30013dc1ccb64bb33b98cbd35de1e",
+    "scoring.py": "933fe6189b0369dad00df80b9e2d6f5cde22dab17cb11786afe2d40476a56b76"
+  },
+  "status": "AWAITING_APPROVAL_NO_LIVE_RESULTS",
+  "plan_sha256": "0f57c8e7264416ee92e4409113a5390fc12373af0d031040432e2f7849d4c065"
+}
