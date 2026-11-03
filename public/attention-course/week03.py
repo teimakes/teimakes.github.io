@@ -10,9 +10,15 @@ from torch.nn import functional as F
 
 
 def make_batch(size, generator, length=8):
-    """임의 기호와 마지막 QUERY로 입력을 만들고 첫 기호를 복사할 정답으로 둡니다.
+    """QUERY 다음에 첫 번째 기호를 복사하는 표본을 만듭니다.
 
-    입력과 라벨은 (배치, 길이)이며 QUERY 외의 라벨은 -100으로 무시합니다.
+    inputs는 (B, T)이며 0~7의 정수 기호를 무작위로 생성합니다.
+    마지막 입력은 전용 QUERY 기호 ID인 8로 바꿉니다.
+    labels는 같은 모양으로 만들고 처음에는 모두 -100을 넣습니다.
+    QUERY 위치의 라벨만 첫 번째 입력 기호로 바꿉니다.
+
+    cross_entropy는 -100 위치의 출력 손실을 무시합니다. 해당 위치가
+    입력에서 제거되는 것은 아니며 QUERY가 그 표현을 참조할 수 있습니다.
     """
     inputs = torch.randint(8, (size, length), generator=generator)
     inputs[:, -1] = 8  # QUERY marker
@@ -23,6 +29,16 @@ def make_batch(size, generator, length=8):
 
 class CausalCopy(nn.Module):
     def __init__(self, context=12, dim=32):
+        """지연 복사를 학습할 단일 헤드 셀프 어텐션을 구성합니다.
+
+        token은 숫자 8종과 QUERY를 dim차원으로 표현합니다.
+        position은 최대 context개 위치의 학습 가능한 임베딩입니다.
+        norm은 각 토큰의 특성 축을 정규화합니다.
+        qkv는 dim차원 입력을 3*dim으로 변환해 Q·K·V를 함께 계산합니다.
+        output은 각 위치의 표현을 정답 숫자 8개의 logits로 바꿉니다.
+
+        이 모델에는 별도의 FFN이나 여러 헤드를 추가하지 않습니다.
+        """
         super().__init__()
         self.token = nn.Embedding(9, dim)
         self.position = nn.Embedding(context, dim)
@@ -31,9 +47,19 @@ class CausalCopy(nn.Module):
         self.output = nn.Linear(dim, 8)
 
     def forward(self, ids):
-        """미래 위치를 가리는 셀프 어텐션으로 각 위치의 logits를 계산합니다.
+        """미래 위치를 차단하고 각 위치의 숫자 logits를 계산합니다.
 
-        ids: (B, T), logits: (B, T, 8), weights: (B, T, T).
+        ids는 (B, T) 정수 입력입니다.
+        x는 토큰 임베딩과 위치 임베딩을 더한 (B, T, D) 표현입니다.
+        qkv(norm(x)).chunk(3, dim=-1)는 Q·K·V를 각각 (B, T, D)로 나눕니다.
+        scores는 (B, T, T)이며 행은 Query, 열은 Key 위치입니다.
+        triu(1)은 자기 자신을 제외한 미래 Key 위치만 True로 만듭니다.
+        masked_fill은 그 점수를 -inf로 바꾸고 softmax로 가중치를 계산합니다.
+        x + weights @ v는 원래 표현에 문맥을 더하는 잔차 연결입니다.
+        output은 이를 (B, T, 8) logits로 변환합니다.
+
+        logits와 (B, T, T) weights를 반환합니다. 학습 손실은 QUERY
+        위치에만 적용하지만 다른 위치의 logits도 인과성 검사에 사용합니다.
         """
         length = ids.size(1)
         x = self.token(ids) + self.position(torch.arange(length, device=ids.device))
@@ -50,9 +76,14 @@ class CausalCopy(nn.Module):
 
 @torch.no_grad()
 def evaluate(model, batch):
-    """기울기를 기록하지 않고 손실과 정확도를 계산합니다.
+    """QUERY 답의 정확도와 첫 위치의 어텐션 가중치를 측정합니다.
 
-    실습별로 선택 위치, 검색 위치 또는 답 위치도 함께 측정합니다.
+    logits.flatten(0, 1)은 (B, T, 8)을 (B*T, 8)로 바꿉니다.
+    y.flatten()은 (B*T,) 라벨이며 -100인 출력 위치는 손실에서 제외됩니다.
+    accuracy는 마지막 위치가 첫 입력 기호를 맞혔는지 계산합니다.
+    first_mass는 weights[:, -1, 0], 즉 QUERY가 첫 위치에 준 가중치의 평균입니다.
+
+    반환 지표는 기울기가 없는 Python 숫자입니다.
     """
     model.eval()
     x, y = batch
@@ -63,7 +94,18 @@ def evaluate(model, batch):
 
 
 def main():
-    """실행 옵션을 읽고 학습, 검증과 결과 저장을 순서대로 수행합니다."""
+    """첫 기호 복사 모델을 학습하고 인과적 정보 범위를 검사합니다.
+
+    --length는 학습 시퀀스 길이이며 위치 임베딩 범위인 2~12만 허용합니다.
+    검증 표본을 고정하고 매 단계 새로운 학습 표본 128개를 생성합니다.
+    logits의 배치·위치 축을 합친 뒤 -100이 아닌 라벨로 손실을 계산합니다.
+    zero_grad, backward, 클리핑, AdamW 갱신 후 주기적으로 검증합니다.
+
+    마지막 두 입력을 바꿔도 그 이전 logits가 유지되는지 검사합니다.
+    미래 위치의 가중치가 0인지, 표본을 단독 또는 배치로 계산해도
+    결과가 같은지도 확인합니다. 이 검사는 정답 정확도와 별개입니다.
+    평가 이력과 예측 예시를 metrics.json, 모델 상태를 model.pt에 저장합니다.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument('--steps', type=int, default=700)
     parser.add_argument('--seed', type=int, default=43)

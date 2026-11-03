@@ -9,9 +9,19 @@ from torch.nn import functional as F
 
 
 def make_batch(size, generator, length=8):
-    """표식과 수치로 구성된 입력을 만들고, 표식 위치의 수치 부호를 정답으로 반환합니다.
+    """표식 위치의 수치 부호를 분류하는 표본을 생성합니다.
 
-    입력은 (배치, 위치, 2), 정답과 선택 위치는 각각 (배치,)입니다.
+    size는 배치 크기 B, length는 입력 위치 수 T입니다. generator를
+    인자로 받아 학습 표본과 검증 표본의 난수 상태를 따로 관리합니다.
+
+    values: (B, T). 각 위치의 수치를 표준 정규분포에서 뽑습니다.
+    selected: (B,). 표본마다 정답을 결정할 위치 하나를 고릅니다.
+    marker: (B, T). selected 위치만 1이고 나머지는 0인 표식입니다.
+    inputs: (B, T, 2). 표식과 수치를 마지막 축으로 결합합니다.
+    labels: (B,). 선택한 위치의 수치가 양수이면 1, 아니면 0입니다.
+
+    inputs, labels, selected를 반환합니다. selected는 가중치를 분석할
+    때 사용하며, 학습 손실에 위치 정답으로 전달하지 않습니다.
     """
     values = torch.randn(size, length, generator=generator)
     selected = torch.randint(length, (size,), generator=generator)
@@ -23,15 +33,39 @@ def make_batch(size, generator, length=8):
 
 class AttentionClassifier(nn.Module):
     def __init__(self):
+        """위치 점수, 값 변환, 최종 분류를 담당하는 계층을 만듭니다.
+
+        scorer의 첫 Linear는 위치별 두 특성을 16차원으로 변환합니다.
+        Tanh 이후 두 번째 Linear가 위치마다 점수 하나를 출력합니다.
+        value는 같은 두 특성을 가중합에 사용할 16차원 벡터로 만듭니다.
+        classifier는 문맥 벡터를 두 클래스의 logits로 변환합니다.
+
+        각 Linear의 가중치와 편향은 학습 중 함께 갱신됩니다.
+        """
         super().__init__()
         self.scorer = nn.Sequential(nn.Linear(2, 16), nn.Tanh(), nn.Linear(16, 1))
         self.value = nn.Linear(2, 16)
         self.classifier = nn.Linear(16, 2)
 
     def forward(self, inputs, uniform=False):
-        """입력 위치의 중요도를 학습해 분류 logits와 가중치를 반환합니다.
+        """위치 가중치를 계산하고 입력을 분류합니다.
 
-        inputs: (B, T, 2), logits: (B, 2), weights: (B, T).
+        inputs는 (B, T, 2)입니다. 마지막 축의 순서는 표식, 수치입니다.
+
+        scores = scorer(inputs).squeeze(-1)
+            (B, T, 1)에서 마지막 축만 없애 (B, T) 점수를 얻습니다.
+        weights = scores.softmax(dim=-1)
+            표본별 T개 위치의 합이 1이 되도록 정규화합니다.
+        uniform=True
+            평가 실험에서만 가중치를 1/T로 바꿉니다. 분류기와 value는
+            그대로 사용하므로 균등 풀링 모델을 재학습하는 것과 다릅니다.
+        context = bmm(weights.unsqueeze(1), value(inputs)).squeeze(1)
+            (B, 1, T)와 (B, T, 16)의 곱으로 (B, 16)을 얻습니다.
+            각 표본 안에서만 가중합하며 서로 다른 표본은 섞지 않습니다.
+        classifier(context)
+            문맥 벡터에서 (B, 2) logits를 계산합니다.
+
+        반환값은 logits와 (B, T) weights입니다.
         """
         scores = self.scorer(inputs).squeeze(-1)
         # 위치별 점수를 확률로 바꾸어 어느 입력을 참고할지 정합니다.
@@ -45,9 +79,17 @@ class AttentionClassifier(nn.Module):
 
 @torch.no_grad()
 def evaluate(model, batch, uniform=False):
-    """기울기를 기록하지 않고 손실과 정확도를 계산합니다.
+    """고정된 표본으로 분류 성능과 선택 가중치를 측정합니다.
 
-    실습별로 선택 위치, 검색 위치 또는 답 위치도 함께 측정합니다.
+    @torch.no_grad()는 기울기 기록을 중지합니다. model.eval()은
+    평가 모드를 설정합니다. 학습을 다시 할 때는 train()이 필요합니다.
+
+    cross_entropy는 (B, 2) logits와 (B,) 정수 라벨의 손실입니다.
+    accuracy는 argmax로 고른 클래스가 라벨과 같은 표본의 비율입니다.
+    selected_mass는 각 표본의 selected 위치에 준 가중치의 평균입니다.
+    uniform을 forward로 전달하면 균등 가중치 개입도 같은 기준으로 평가합니다.
+
+    item()으로 각 지표를 Python 숫자로 바꿔 사전에 담아 반환합니다.
     """
     model.eval()
     inputs, labels, selected = batch
@@ -60,7 +102,18 @@ def evaluate(model, batch, uniform=False):
 
 
 def main():
-    """실행 옵션을 읽고 학습, 검증과 결과 저장을 순서대로 수행합니다."""
+    """표본 선택 분류기를 학습하고 가중치 변화를 기록합니다.
+
+    1. --steps, --seed, --out을 읽고 CPU 스레드를 하나로 설정합니다.
+    2. 모델 초기화 시드와 학습·검증 데이터의 생성기를 따로 정합니다.
+    3. 검증 2,048개를 고정하고 학습 전 지표를 history에 기록합니다.
+    4. 매 단계 새 학습 표본 128개로 분류 손실을 계산합니다.
+    5. zero_grad → backward → 기울기 클리핑 → step 순서로 갱신합니다.
+       첫 단계에는 scorer 기울기를 출력하고, 끝나면 파라미터 변화를 검사합니다.
+    6. 100단계마다 검증하고 선택 위치의 평균 가중치를 기록합니다.
+    7. 가중치 합이 1인지 검사하고 균등 가중치 개입의 성능을 계산합니다.
+    8. metrics.json과 model.pt를 지정한 출력 폴더에 저장합니다.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument('--steps', type=int, default=700)
     parser.add_argument('--seed', type=int, default=41)
