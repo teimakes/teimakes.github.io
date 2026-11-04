@@ -159,6 +159,7 @@ input:focus-visible {
 
 .post-meta {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.75rem;
   align-items: center;
   font-size: 0.85rem;

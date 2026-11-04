@@ -1,4 +1,5 @@
 ---
+import { canonicalPath, pageLanguage } from '../lib/seo';
 interface Props {
   title: string;
   description: string;
@@ -14,7 +15,7 @@ const fmt = (d: Date) =>
 
 <article class="post-card">
   <h2 class="post-card-title">
-    <a href={url}>{title}</a>
+    <a href={canonicalPath(url)} lang={pageLanguage(url)}>{title}</a>
   </h2>
   <div class="post-meta">
     <time datetime={date.toISOString()}>{fmt(date)}</time>

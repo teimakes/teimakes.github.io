@@ -1,7 +1,7 @@
 ---
 layout: '../../layouts/Post.astro'
 title: '어텐션과 트랜스포머 1: 어텐션의 점수와 가중합'
-description: '어텐션과 트랜스포머의 계산 원리를 PyTorch 학습 실습으로 이해합니다.'
+description: '어텐션 점수, 소프트맥스 가중치, 가중합을 직접 계산하고 PyTorch 분류 실험으로 평균 풀링과 비교합니다.'
 date: '2026-11-03'
 tags: ['attention', 'transformer', 'pytorch', 'deep-learning']
 ---

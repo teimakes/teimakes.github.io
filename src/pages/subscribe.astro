@@ -1,24 +1,16 @@
 ---
 import Base from '../layouts/Base.astro';
 ---
-
-<Base title="Subscribe">
-  <section class="hero">
-    <h1>Subscribe</h1>
-    <p>Get new posts delivered straight to your inbox.</p>
-  </section>
-
+<Base title="Subscribe with RSS" description="Follow teimakes posts in your feed reader with RSS or JSON Feed. No email signup is required.">
+  <section class="hero"><h1>Subscribe</h1><p>Follow new posts in your favorite feed reader.</p></section>
   <div class="prose">
-    <p>
-      If you want to stay up to date with my latest posts you can sign up to my newsletter.
-      I promise I won't spam you. (To be honest, I'm not the best at keeping up with a newsletter schedule...)
-    </p>
-    <form class="subscribe-form" action="https://listmonk.example.com/subscribe" method="post">
-      <input type="email" name="email" placeholder="you@example.com" required />
-      <button type="submit">Subscribe</button>
-    </form>
-    <p style="margin-top:1rem;font-size:0.85rem;color:var(--muted);">
-      Prefer RSS? Subscribe via <a href="/rss.xml">the feed</a> instead.
-    </p>
+    <p>Add one of these feed addresses to your reader:</p>
+    <ul>
+      <li><a href="/rss.xml">RSS feed</a>: <code>https://teimakes.github.io/rss.xml</code></li>
+      <li><a href="/feed.json">JSON Feed</a>: <code>https://teimakes.github.io/feed.json</code></li>
+    </ul>
+    <p>The feeds include published posts in Korean and English. Your reader checks for new entries automatically.</p>
+    <p>Email subscriptions are not currently available. This site does not collect email addresses.</p>
+    <p lang="ko">RSS 리더에서 위 주소를 추가하면 새 글을 받아볼 수 있습니다. 현재 이메일 뉴스레터는 운영하지 않습니다.</p>
   </div>
 </Base>

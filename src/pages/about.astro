@@ -1,30 +1,24 @@
 ---
 import Base from '../layouts/Base.astro';
-const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+import { SITE } from '../config';
 ---
-
-<Base title="About">
+<Base title="About Taieui Song" description="Meet Taieui Song, the AI engineer behind teimakes: notes on LLMs, attention, RAG, agents, and AI-assisted creative work.">
   <section class="hero">
-    <h1>About</h1>
-    <p>Who I am and what this site is about.</p>
+    <h1>About Taieui Song</h1>
+    <p>AI engineering, research, and creative experiments.</p>
   </section>
-
   <div class="prose">
-    <p>
-      Hey — I'm Taieui Song. By day I work with technology; by night I'm deep in the AI rabbit hole.
-      This blog is my notebook for everything I find interesting across the AI landscape.
-    </p>
-    <p>Things I write about:</p>
+    <p>I'm Taieui Song, an AI engineer interested in large language models and AI-assisted filmmaking, animation, and manga. I publish my technical notes and experiments here as teimakes.</p>
+    <h2>What you'll find here</h2>
     <ul>
-      <li><strong>LLMs</strong> — new model releases, prompt engineering, evaluation and tooling.</li>
-      <li><strong>AI Agents</strong> — autonomous workflows, multi-agent systems, and agent frameworks.</li>
-      <li><strong>AI Movies</strong> — how generative AI is changing filmmaking, from scripts to VFX.</li>
-      <li><strong>AI Animation</strong> — experiments and tools for AI-generated animation.</li>
-      <li><strong>AI Manga</strong> — the explosion of AI-assisted manga and webtoon creation.</li>
+      <li><a href="/posts/attention-01-big-picture-ko/">Attention and Transformers</a>: explanations and PyTorch learning exercises.</li>
+      <li><a href="/posts/full-context-vs-rag-ko/">LLM systems and RAG</a>: experiments, evaluation, and implementation tradeoffs.</li>
+      <li><a href="/posts/building-my-first-ai-agent/">AI agents</a>: tools and workflows.</li>
+      <li><a href="/posts/ai-animation-tools-2025/">Creative AI</a>: tools for animation and visual storytelling.</li>
     </ul>
-    <p>
-      If any of that sounds interesting, consider <a href={`${base}/subscribe`}>subscribing</a> —
-      you'll get my latest posts in your inbox. No spam, ever.
-    </p>
+    <h2>Research, code, and contact</h2>
+    <p>Find my research profile on <a href={SITE.social['Google Scholar']} rel="me">Google Scholar</a>, code on <a href={SITE.social.GitHub} rel="me">GitHub</a>, and professional profile on <a href={SITE.social.LinkedIn} rel="me">LinkedIn</a>. You can contact me through LinkedIn or report a correction in <a href="https://github.com/teimakes/teimakes.github.io/issues">the blog's GitHub issues</a>. Please keep private information out of public issues.</p>
+    <p>These are personal notes. Results depend on the models, data, and settings described in each post. Use the linked sources and experiment details when assessing or reproducing them.</p>
+    <p>Some articles are available in both Korean and English; a language link appears when a translation exists. Follow new posts with <a href="/subscribe/">RSS or JSON Feed</a>.</p>
   </div>
 </Base>

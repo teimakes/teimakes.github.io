@@ -5,8 +5,6 @@ description: "A hands-on linear regression walkthrough with scikit-learn \u2014 
 date: "2025-04-05"
 tags: ["tutorial", "machine-learning", "notebook"]
 ---
-# Linear Regression from Scratch
-
 In this tutorial, we'll build a simple linear regression model using scikit-learn, visualize the results, and understand what the model learned. This notebook doubles as a blog post — everything you see here, including the plots, is generated from the notebook itself.
 
 ## Generating the data

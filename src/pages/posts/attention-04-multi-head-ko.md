@@ -1,7 +1,7 @@
 ---
 layout: '../../layouts/Post.astro'
 title: '어텐션과 트랜스포머 4: 멀티헤드 어텐션'
-description: '어텐션과 트랜스포머의 계산 원리를 PyTorch 학습 실습으로 이해합니다.'
+description: '멀티헤드 어텐션을 구현하고 두 질문을 동시에 푸는 과제에서 헤드별 가중치와 동일 파라미터 조건의 성능을 비교합니다.'
 date: '2026-11-03'
 tags: ['attention', 'transformer', 'pytorch', 'deep-learning']
 ---
