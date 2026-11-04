@@ -1,31 +1,21 @@
 ---
+import SeoHead from '../components/SeoHead.astro';
 import { SITE } from '../config';
 import '../styles/global.css';
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 const blogUrl = new URL(`${base}/`, Astro.site).href;
-const hubUrl = new URL(`${base}/links/`, Astro.site).href;
 const markUrl = `${base}/teimakes-mark.png`;
 const links = [
   { label: 'Blog', href: blogUrl },
   ...Object.entries(SITE.social).map(([label, href]) => ({ label, href })),
 ];
-const pageTitle = `${SITE.title} — ${SITE.author}`;
 ---
 
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{pageTitle}</title>
-    <meta name="description" content={pageTitle} />
-    <meta property="og:title" content={pageTitle} />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content={hubUrl} />
-    <meta property="og:image" content={new URL(markUrl, Astro.site).href} />
-    <link rel="canonical" href={hubUrl} />
-    <link rel="icon" href={markUrl} type="image/png" />
+    <SeoHead title="Links" description="Find Taieui Song's teimakes blog, research profile, code, and AI creative work across the web." />
   </head>
   <body>
     <main class="links-page">

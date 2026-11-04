@@ -1,0 +1,8 @@
+---
+const { lang = 'en' } = Astro.props;
+---
+<aside class="subscribe-box" aria-label={lang === 'ko' ? '구독' : 'Subscribe'}>
+  <h2>{lang === 'ko' ? '새 글을 RSS로 받아보세요' : 'Follow new posts with RSS'}</h2>
+  <p>{lang === 'ko' ? 'RSS 리더에 피드를 추가하면 이메일 등록 없이 새 글을 받아볼 수 있습니다.' : 'Add the feed to your RSS reader. No email address or account is needed on this site.'}</p>
+  <a href="/rss.xml">RSS</a> · <a href="/feed.json">JSON Feed</a> · <a href="/subscribe/">{lang === 'ko' ? '구독 안내' : 'How to subscribe'}</a>
+</aside>

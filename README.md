@@ -8,6 +8,7 @@ Add a `.md` file to `src/pages/posts/`:
 
 ```markdown
 ---
+layout: '../../layouts/Post.astro'
 title: 'My Post Title'
 description: 'A short excerpt shown on the homepage and in feeds.'
 date: '2025-04-01'
@@ -17,7 +18,7 @@ tags: ['llm', 'agents']
 Your content here...
 ```
 
-Set `draft: true` in the frontmatter to hide a post.
+Set `draft: true` to omit a post from lists and feeds and add `noindex`. Its URL remains public; never commit private drafts.
 
 ## Posting Jupyter notebooks
 
@@ -51,7 +52,7 @@ The script also generates **nbconvert HTML notebook versions** of each notebook,
 
 The classic Markdown post remains available at `/posts/<notebook-name>`.
 
-The converted `.md` and assets are checked in, so the GitHub Pages build never needs Python — the notebook pipeline runs only on your machine.
+The converted `.md` and assets are checked in, so the GitHub Pages build never executes notebooks. Its SEO validation uses Python's standard library.
 
 ## Development
 
@@ -59,6 +60,7 @@ The converted `.md` and assets are checked in, so the GitHub Pages build never n
 npm install
 npm run dev       # local dev server
 npm run build     # production build to ./dist
+npm run check:seo # validate generated pages, sitemap and feeds
 npm run preview   # preview the production build
 ```
 
@@ -74,8 +76,10 @@ The Astro `base` is `/`. Keep internal links and notebook asset paths relative t
 
 ## Configuration
 
-Edit `src/config.ts` to change the site title, author, description, social links, and newsletter subscribe URL. Update `site` in `astro.config.mjs` to your final domain.
+Edit `src/config.ts` to change the site title, author, description, social links, and subscription URL. Update `site` in `astro.config.mjs` to your final domain.
 
-## Newsletter
+## Subscriptions and search
 
-The subscribe form on `/subscribe` currently points to a placeholder endpoint. Swap the `action` in `src/pages/subscribe.astro` and the homepage form for your provider (Buttondown, Listmonk, Mailchimp, etc.). RSS and JSON feeds are available at `/rss.xml` and `/feed.json`.
+RSS and JSON feeds with article bodies are available at `/rss.xml` and `/feed.json`. `/subscribe/` explains how to use them; no email service is connected.
+
+See [search and advertising operations](docs/search-and-advertising.md) for registration status, publishing conventions, and the steps needed before enabling advertising.

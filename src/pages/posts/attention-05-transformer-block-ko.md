@@ -1,7 +1,7 @@
 ---
 layout: '../../layouts/Post.astro'
 title: '어텐션과 트랜스포머 5: 트랜스포머 언어 모델 학습과 생성'
-description: '어텐션과 트랜스포머의 계산 원리를 PyTorch 학습 실습으로 이해합니다.'
+description: '임베딩, 위치 정보, 잔차 연결, LayerNorm, FFN을 조립해 작은 디코더 언어 모델을 학습하고 텍스트 생성을 실습합니다.'
 date: '2026-11-03'
 tags: ['attention', 'transformer', 'pytorch', 'deep-learning']
 ---

@@ -2,7 +2,7 @@ export const SITE = {
   title: 'teimakes',
   description: 'Notes on AI, LLMs, AI Agents, AI movies, animation and manga.',
   author: 'Taieui Song',
-  subscribeUrl: '/subscribe',
+  subscribeUrl: '/subscribe/',
   social: {
     GitHub: 'https://github.com/teimakes',
     YouTube: 'https://www.youtube.com/@teimakes',

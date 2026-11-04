@@ -1,24 +1,30 @@
 ---
 import Base from './Base.astro';
-
+import FeedSubscribe from '../components/FeedSubscribe.astro';
+import { SITE } from '../config';
+import { pageLanguage, translations } from '../lib/seo';
 const { frontmatter } = Astro.props;
-const { title, description, date, tags = [] } = frontmatter;
+const { title, description, date, updatedDate, tags = [], draft = false } = frontmatter;
+const lang = frontmatter.lang || pageLanguage(Astro.url.pathname);
 const publishedDate = date ? new Date(date) : undefined;
-const fmt = (value: Date) =>
-  new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'long', day: 'numeric' }).format(value);
+const alternates = draft ? [] : translations(Astro.url.pathname).filter((entry) => entry.lang !== lang);
+const fmt = (value: Date) => new Intl.DateTimeFormat(lang === 'ko' ? 'ko-KR' : 'en-US', {
+  year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
+}).format(value);
 ---
-
-<Base title={title} description={description}>
+<Base title={title} description={description} lang={lang} article={date ? { date, updatedDate, tags } : undefined} noindex={draft}>
   <article>
     <header class="article-header">
       <h1>{title}</h1>
       <div class="post-meta">
+        <a href="/about/" rel="author">{SITE.author}</a>
         {publishedDate && <time datetime={publishedDate.toISOString()}>{fmt(publishedDate)}</time>}
         {tags.length > 0 && <span class="post-tags">{tags.map((tag: string) => `#${tag}`).join(' ')}</span>}
       </div>
+      {updatedDate && <p class="post-meta">{lang === 'ko' ? '수정' : 'Updated'} <time datetime={new Date(updatedDate).toISOString()}>{fmt(new Date(updatedDate))}</time></p>}
+      {alternates.map(({ lang, path }) => <p><a href={path} hreflang={lang} lang={lang}>{lang === 'ko' ? '한국어로 읽기' : 'Read in English'}</a></p>)}
     </header>
-    <div class="prose">
-      <slot />
-    </div>
+    <div class="prose"><slot /></div>
   </article>
+  <FeedSubscribe lang={lang} />
 </Base>

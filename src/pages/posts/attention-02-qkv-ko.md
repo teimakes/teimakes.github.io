@@ -1,7 +1,7 @@
 ---
 layout: '../../layouts/Post.astro'
 title: '어텐션과 트랜스포머 2: Q·K·V와 어텐션 학습'
-description: '어텐션과 트랜스포머의 계산 원리를 PyTorch 학습 실습으로 이해합니다.'
+description: 'Query·Key·Value의 역할과 텐서 차원을 따라가며 스케일드 닷 프로덕트 어텐션과 학습 가능한 투영을 PyTorch로 구현합니다.'
 date: '2026-11-03'
 tags: ['attention', 'transformer', 'pytorch', 'deep-learning']
 ---

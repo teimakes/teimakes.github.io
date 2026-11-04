@@ -5,8 +5,6 @@ description: "scikit-learn을 활용한 실습형 선형 회귀 walkthrough — 
 date: "2025-04-05"
 tags: ["tutorial", "machine-learning", "notebook"]
 ---
-# Linear Regression from Scratch
-
 이 튜토리얼에서는 scikit-learn으로 간단한 선형 회귀 모델을 만들고, 결과를 시각화하고, 모델이 무엇을 학습했는지 이해해 봅니다. 이 노트북은 블로그 포스트 역할도 겸해요 — 여기에 보이는 모든 것, 플롯을 포함해서, 노트북 자체에서 생성된 것입니다.
 
 ## 데이터 생성하기

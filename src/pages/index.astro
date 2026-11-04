@@ -1,20 +1,28 @@
 ---
 import Base from '../layouts/Base.astro';
+import FeedSubscribe from '../components/FeedSubscribe.astro';
 import PostCard from '../components/PostCard.astro';
 
 const postImportResult = import.meta.glob('./posts/*.{md,mdx}', { eager: true });
 const posts = Object.values(postImportResult)
   .filter((p: any) => !p.frontmatter.draft)
   .sort((a: any, b: any) => new Date(b.frontmatter.date) - new Date(a.frontmatter.date));
-const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <Base>
   <section class="hero">
-    <h1>Hey there. 👋</h1>
+    <h1>AI, LLMs & Creative Experiments</h1>
     <p>I'm Taieui Song. I write about AI — LLMs, agents, and the weird new world of AI movies, animation and manga.</p>
   </section>
 
+  <section aria-labelledby="start-here" class="prose">
+    <h2 id="start-here" class="section-title">Start here · 처음 읽을 글</h2>
+    <ul lang="ko">
+      <li><a href="/posts/nlp-before-llms-ko/">LLM 이전의 자연어 처리부터 시작하기</a></li>
+      <li><a href="/posts/attention-01-big-picture-ko/">어텐션과 트랜스포머: PyTorch 실습 시리즈</a></li>
+      <li><a href="/posts/full-context-vs-rag-ko/">Full Context와 RAG 비교 실험</a></li>
+    </ul>
+  </section>
   <h2 class="section-title">Latest Posts</h2>
   <div class="post-list">
     {posts.map((p: any) => (
@@ -28,12 +36,5 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     ))}
   </div>
 
-  <div class="subscribe-box">
-    <h2>Subscribe</h2>
-    <p>If you want to stay up to date with my latest posts you can sign up to my newsletter. I promise I won't spam you.</p>
-    <form class="subscribe-form" action={`${base}/subscribe`} method="get">
-      <input type="email" name="email" placeholder="you@example.com" required />
-      <button type="submit">Subscribe</button>
-    </form>
-  </div>
+  <FeedSubscribe />
 </Base>

@@ -7,7 +7,8 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "deploy": "astro build && wrangler pages deploy dist"
+    "deploy": "astro build && wrangler pages deploy dist",
+    "check:seo": "python3 scripts/check_seo.py"
   },
   "dependencies": {
     "@astrojs/mdx": "^1.1.0",

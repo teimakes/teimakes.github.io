@@ -132,7 +132,8 @@ def export_markdown(nb_path, meta):
     meta_json = json.dumps(meta, indent=2)
     for snippet in (meta_json, json.dumps(meta)):
         body = body.replace(snippet, "")
-    return body.lstrip("\n")
+    # The page layout renders the title; omit the notebook's leading H1.
+    return re.sub(r"\A\s*# [^\n]+\n+", "", body).lstrip("\n")
 
 
 def front_matter(meta):
@@ -142,6 +143,7 @@ def front_matter(meta):
     else:
         tags = [str(tags)]
     return {
+        "layout": "../../layouts/Post.astro",
         "title": str(meta["title"]),
         "description": str(meta["description"]),
         "date": str(meta["date"]),

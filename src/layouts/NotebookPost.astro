@@ -1,5 +1,7 @@
 ---
 import { SITE } from '../config';
+import SeoHead from '../components/SeoHead.astro';
+import FeedSubscribe from '../components/FeedSubscribe.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import '../styles/global.css';
@@ -14,25 +16,15 @@ interface Props {
 }
 
 const { title, description, html, date, tags, layout = 'centered' } = Astro.props;
-const pageTitle = title ? `${title} — ${SITE.title}` : `${SITE.title} — ${SITE.description}`;
-const desc = description || SITE.description;
+const canonical = Astro.url.pathname.replace('/notebooks/', '/posts/').replace(/-(full|centered)\/?$/, '/');
 const fmt = (d: Date) =>
   new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'long', day: 'numeric' }).format(d);
-const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{pageTitle}</title>
-    <meta name="description" content={desc} />
-    <meta property="og:title" content={pageTitle} />
-    <meta property="og:description" content={desc} />
-    <meta property="og:type" content="article" />
-    <link rel="alternate" type="application/rss+xml" title={SITE.title} href={`${base}/rss.xml`} />
-    <link rel="icon" href={`${base}/teimakes-mark.png`} type="image/png" />
+    <SeoHead title={title} description={description} canonical={canonical} article={date ? { date, tags } : undefined} />
   </head>
   <body class:list={['notebook-page', `layout-${layout}`]}>
     <Header />
@@ -41,6 +33,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <header class="article-header">
           <h1>{title}</h1>
           <div class="post-meta">
+            <a href="/about/" rel="author">{SITE.author}</a>
             {date && <time datetime={new Date(date).toISOString()}>{fmt(new Date(date))}</time>}
             {tags && tags.length > 0 && (
               <span class="post-tags">{tags.map((t: string) => `#${t}`).join(' ')}</span>
@@ -49,14 +42,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         </header>
         <div class="notebook-body" set:html={html} />
       </article>
-      <div class="subscribe-box">
-        <h2>Enjoyed this post?</h2>
-        <p>Subscribe to get new posts in your inbox. No spam, ever.</p>
-        <form class="subscribe-form" action={`${base}/subscribe`} method="get">
-          <input type="email" name="email" placeholder="you@example.com" required />
-          <button type="submit">Subscribe</button>
-        </form>
-      </div>
+      <FeedSubscribe />
     </main>
     <Footer />
   </body>

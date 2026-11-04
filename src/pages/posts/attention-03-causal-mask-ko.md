@@ -1,7 +1,7 @@
 ---
 layout: '../../layouts/Post.astro'
 title: '어텐션과 트랜스포머 3: 인과적 셀프 어텐션'
-description: '어텐션과 트랜스포머의 계산 원리를 PyTorch 학습 실습으로 이해합니다.'
+description: '미래 토큰을 가리는 인과 마스크의 원리를 배우고 지연 복사 과제로 셀프 어텐션의 정보 누출과 패딩 처리를 점검합니다.'
 date: '2026-11-03'
 tags: ['attention', 'transformer', 'pytorch', 'deep-learning']
 ---
