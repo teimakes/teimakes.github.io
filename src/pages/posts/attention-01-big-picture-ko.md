@@ -1,7 +1,7 @@
 ---
 layout: '../../layouts/Post.astro'
 title: '어텐션과 트랜스포머 1: 어텐션의 점수와 가중합'
-description: '어텐션과 트랜스포머의 계산 원리를 PyTorch 학습 실습으로 이해합니다.'
+description: '분류 정답만으로 위치별 가중치를 학습하는 어텐션 풀링을 PyTorch로 구현하고, 가중치 합과 선택 위치 집중도를 검증합니다.'
 date: '2026-11-03'
 tags: ['attention', 'transformer', 'pytorch', 'deep-learning']
 ---

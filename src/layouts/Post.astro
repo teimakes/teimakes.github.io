@@ -6,9 +6,20 @@ const { title, description, date, tags = [] } = frontmatter;
 const publishedDate = date ? new Date(date) : undefined;
 const fmt = (value: Date) =>
   new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'long', day: 'numeric' }).format(value);
+const lang = Astro.url.pathname.includes('-ko/') ? 'ko' : 'en';
+const allPosts = import.meta.glob('../pages/posts/**/*.{md,mdx}', { eager: true });
+const slugs = new Set(Object.keys(allPosts).map((p) => p.replace(/^.*\/posts\//, '').replace(/\.(md|mdx)$/, '')));
+const slug = Astro.url.pathname.replace(/^\/posts\//, '').replace(/\/$/, '');
+const sibling = slug.endsWith('-ko') ? slug.slice(0, -3) : `${slug}-ko`;
+const alternates = slugs.has(sibling)
+  ? [
+      { lang: 'ko', href: new URL(`/posts/${slug.endsWith('-ko') ? slug : sibling}/`, Astro.site).href },
+      { lang: 'en', href: new URL(`/posts/${slug.endsWith('-ko') ? sibling : slug}/`, Astro.site).href },
+    ]
+  : [];
 ---
 
-<Base title={title} description={description}>
+<Base title={title} description={description} lang={lang} alternates={alternates}>
   <article>
     <header class="article-header">
       <h1>{title}</h1>

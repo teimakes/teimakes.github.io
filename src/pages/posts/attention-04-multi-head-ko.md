@@ -1,7 +1,7 @@
 ---
 layout: '../../layouts/Post.astro'
 title: '어텐션과 트랜스포머 4: 멀티헤드 어텐션'
-description: '어텐션과 트랜스포머의 계산 원리를 PyTorch 학습 실습으로 이해합니다.'
+description: '색과 모양을 동시에 검색하는 과제를 멀티헤드 교차 어텐션으로 풀고, 헤드 수에 따른 성능과 파라미터 수 변화를 비교합니다.'
 date: '2026-11-03'
 tags: ['attention', 'transformer', 'pytorch', 'deep-learning']
 ---
