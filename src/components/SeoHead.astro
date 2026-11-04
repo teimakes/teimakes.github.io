@@ -30,6 +30,7 @@ const schema = article ? {
 <title>{pageTitle}</title>
 <meta name="description" content={description} />
 <link rel="canonical" href={url} />
+{Astro.url.pathname === '/' && <meta name="msvalidate.01" content="78828D2630C9F5A4081A883DDA4D64EE" />}
 {noindex && <meta name="robots" content="noindex, follow" />}
 {alternates.map(({ lang, path }) => <link rel="alternate" hreflang={lang} href={new URL(path, site).href} />)}
 <meta property="og:title" content={pageTitle} />

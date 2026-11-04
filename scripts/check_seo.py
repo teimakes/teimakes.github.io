@@ -81,6 +81,7 @@ feed = json.loads((ROOT / 'feed.json').read_text())
 assert {item['url'] for item in feed['items']} == posts
 assert all(item['content_html'] and item['id'] == item['url'] for item in feed['items'])
 assert (ROOT / 'rss.xml').stat().st_size < 10 * 1024 * 1024
+assert 'name="msvalidate.01" content="78828D2630C9F5A4081A883DDA4D64EE"' in (ROOT / 'index.html').read_text()
 assert 'Sitemap: ' + SITE + '/sitemap.xml' in (ROOT / 'robots.txt').read_text()
 assert (ROOT / 'googlea8fa32c94d27f661.html').read_text().strip() == 'google-site-verification: googlea8fa32c94d27f661.html'
 for file in ROOT.rglob('*.html'):
