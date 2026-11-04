@@ -9,7 +9,7 @@ export async function GET(context: { site: URL }) {
   const urls = [
     ...staticPages.map((path) => ({ loc: new URL(path, site).href, priority: path === '' ? '1.0' : '0.5' })),
     ...posts.map((p: any) => ({
-      loc: new URL(p.url, site).href,
+      loc: new URL(`${p.url.replace(/\/$/, '')}/`, site).href,
       lastmod: new Date(p.frontmatter.date).toISOString(),
       priority: '0.8',
     })),

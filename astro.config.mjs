@@ -4,6 +4,7 @@ import mdx from '@astrojs/mdx';
 export default defineConfig({
   site: 'https://teimakes.github.io',
   base: '/',
+  trailingSlash: 'always',
   integrations: [mdx()],
   markdown: {
     shikiConfig: {
