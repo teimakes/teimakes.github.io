@@ -1,12 +1,12 @@
 ---
 layout: '../../layouts/Post.astro'
 title: 'Mistral API와 Vibe로 배우는 AI 활용 Cookbook'
-description: 'Mistral API 공식 SDK로 채팅·스트리밍·구조화 출력·도구 호출·RAG·OCR까지직접 해 보고, 코딩 에이전트 Vibe로 확장하는 방법을 레시피별로 정리했습니다.'
+description: 'Mistral API 공식 SDK로 채팅·스트리밍·구조화 출력·도구 호출·RAG·OCR까지 직접 해 보고, 코딩 에이전트 Vibe로 확장하는 방법을 레시피별로 정리했습니다.'
 date: '2026-11-10'
 tags: ['mistral', 'api', 'llm', 'vibe', 'agents']
 ---
 
-Mistral API를 "읽기만 하지 않고 직접 손에 묻히는" 가장 빠른 길은 예제를 따라 치는 것입니다. 이 글은 공식 Python SDK(`mistralai`) 기준으로, 채팅부터 RAG까지 레시피 6개와 코딩 에이전트 Vibe 활용 팁까지まとめました. API 키는 코드에 넣지 말고 환경변수로 관리하세요.
+Mistral API를 "읽기만 하지 않고 직접 손에 묻히는" 가장 빠른 길은 예제를 따라 치는 것입니다. 이 글은 공식 Python SDK(`mistralai`) 기준으로, 채팅부터 RAG까지 레시피 6개와 코딩 에이전트 Vibe 활용 팁까지 정리했습니다. API 키는 코드에 넣지 말고 환경변수로 관리하세요.
 
 ## 0. 준비하기
 
@@ -140,7 +140,7 @@ final = client.chat.complete(model="mistral-large-latest", messages=messages, to
 print(final.choices[0].message.content)
 ```
 
-## 5. 임베딩으로簡易 RAG 만들기
+## 5. 임베딩으로 간단한 RAG 만들기
 
 문서를 벡터로 바꿔 두고, 질문과 가장 가까운 청크를 컨텍스트로 넣어 답하게 합니다. 임베딩 모델은 `mistral-embed`입니다.
 
@@ -199,7 +199,7 @@ for page in result.pages:
 [Vibe](https://mistral.ai/)는 저장소를 직접 읽고 고치는 코딩 에이전트라서, 이 글의 예제 코드를 실제 프로젝트로 키우는 데 딱입니다.
 
 - 저장소를 먼저 지정해서 요청합니다: "이 저장소를 클론해서 예제 코드를 내 프로젝트에 맞게 바꿔 줘"처럼 대상을 분명히 합니다.
-- "코드를 고쳐 줘", "리뷰만 해 줘", "테스트를 추가해 줘"처럼 수정·검토·실행을 나누어 의뢰하면결과가安定적입니다.
+- "코드를 고쳐 줘", "리뷰만 해 줘", "테스트를 추가해 줘"처럼 수정·검토·실행을 나누어 의뢰하면 결과가 안정적입니다.
 - 저장소의 `AGENTS.md`나 `CONTRIBUTING.md`를 먼저 읽도록 요청하면 규칙을 자연스럽게 따릅니다.
 - API 키는 환경변수로만 쓰고, "비밀키는 절대 코드에 넣지 마"라고 못 박아 두세요.
 - 변경은 브랜치에서 커밋하고 PR로 올리도록 요청하면 이력이 깔끔합니다.
@@ -225,4 +225,4 @@ for page in result.pages:
 - [Learn with Mistral](https://learn.mistral.ai/)
 - [mistralai Python SDK (GitHub)](https://github.com/mistralai/client-python)
 
-실제 API 사용량에 따른課金은 La Plateforme의請求 정책을 따릅니다.Happy hacking!
+실제 API 사용량에 따른 요금은 La Plateforme의 청구 정책을 따릅니다. Happy hacking!
