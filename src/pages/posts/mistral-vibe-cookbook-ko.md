@@ -218,10 +218,15 @@ for page in result.pages:
 
 요금과 최신 모델 목록은 [La Plateforme](https://console.mistral.ai/)과 [가격표](https://mistral.ai/pricing)에서 확인하세요.
 
+## 9. 전체 실행용 스크립트
+
+이 글의 예제를 포함한 실행 가능한 cookbook 스크립트 19개는 이 저장소의 [`cookbook/mistral/`](https://github.com/teimakes/teimakes.github.io/tree/vibe/mistral-vibe-cookbook-94b7f6/cookbook/mistral)에서 내려받을 수 있습니다. 임베딩 분류·클러스터링, 다중 소스 RAG 라우터, 구조화 OCR, Pixtral 비전, Moderation, LLM-as-a-Judge 평가, 합성 데이터 생성·fine-tune, 배치 추론, Text2SQL, Agents API까지 포함됩니다.
+
 ## 참고 자료
 
 - [Mistral AI 공식 문서](https://docs.mistral.ai/)
 - [공식 Cookbook 모음](https://docs.mistral.ai/resources/cookbooks)
+- [공식 Cookbook 저장소 (GitHub)](https://github.com/mistralai/cookbook)
 - [Learn with Mistral](https://learn.mistral.ai/)
 - [mistralai Python SDK (GitHub)](https://github.com/mistralai/client-python)
 
